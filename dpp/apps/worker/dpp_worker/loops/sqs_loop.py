@@ -177,10 +177,10 @@ class WorkerLoop:
             if not executor:
                 raise ValueError(f"Unknown pack_type: {pack_type}")
 
-            # Parse inputs from run (stored as JSON in DB or separate table)
-            # For now, assume inputs are minimal
-            inputs = {"question": "Sample question", "mode": "brief"}
-            timebox_sec = 90  # Default
+            # P1-7: Use persisted reservation parameters and inputs from DB
+            inputs = run.inputs_json or {"question": "Sample question", "mode": "brief"}
+            timebox_sec = run.timebox_sec or 90  # Use persisted value or default
+            # min_reliability_score = run.min_reliability_score or 0.8  # Available if executor needs it
 
             envelope_data, actual_cost_usd_micros = executor.execute(
                 run_id=run_id,

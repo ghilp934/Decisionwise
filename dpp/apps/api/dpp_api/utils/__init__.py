@@ -1,5 +1,6 @@
 """Utility functions and helpers."""
 
+from dpp_api.utils.logging import JSONFormatter, configure_json_logging
 from dpp_api.utils.money import (
     AmountTooLargeError,
     MoneyError,
@@ -20,4 +21,6 @@ __all__ = [
     "format_usd_micros",
     "parse_usd_string",
     "validate_usd_micros",
+    "JSONFormatter",
+    "configure_json_logging",
 ]

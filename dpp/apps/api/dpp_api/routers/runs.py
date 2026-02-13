@@ -69,7 +69,11 @@ async def create_run(
     if existing_run:
         # Idempotency: Return existing run if hash matches
         if existing_run.payload_hash == payload_hash:
-            logger.info(f"Idempotent request for run {existing_run.run_id}")
+            # P1-9: Include trace_id in logs
+            logger.info(
+                f"Idempotent request for run {existing_run.run_id}",
+                extra={"trace_id": existing_run.trace_id} if existing_run.trace_id else {},
+            )
             # P1-6: Add cost headers
             response.headers["X-DPP-Cost-Reserved"] = format_usd_micros(existing_run.reservation_max_cost_usd_micros)
             response.headers["X-DPP-Cost-Minimum-Fee"] = format_usd_micros(existing_run.minimum_fee_usd_micros)
@@ -111,6 +115,7 @@ async def create_run(
     # Create run record (status=QUEUED, money_state=NONE initially)
     retention_until = datetime.now(timezone.utc) + timedelta(days=30)
 
+    # P1-7: Store reservation parameters and inputs for worker
     run = Run(
         run_id=run_id,
         tenant_id=tenant_id,
@@ -123,6 +128,9 @@ async def create_run(
         version=0,
         reservation_max_cost_usd_micros=max_cost_usd_micros,
         minimum_fee_usd_micros=minimum_fee_usd_micros,
+        timebox_sec=request.reservation.timebox_sec,  # P1-7
+        min_reliability_score=request.reservation.min_reliability_score,  # P1-7
+        inputs_json=request.inputs,  # P1-7
         retention_until=retention_until,
         trace_id=request.meta.trace_id if request.meta else None,
     )
@@ -137,7 +145,11 @@ async def create_run(
             # Fetch the existing run
             existing_run = repo.get_by_idempotency_key(tenant_id, idempotency_key)
             if existing_run and existing_run.payload_hash == payload_hash:
-                logger.info(f"Race: Returning existing run {existing_run.run_id}")
+                # P1-9: Include trace_id in logs
+                logger.info(
+                    f"Race: Returning existing run {existing_run.run_id}",
+                    extra={"trace_id": existing_run.trace_id} if existing_run.trace_id else {},
+                )
                 # P1-6: Add cost headers
                 response.headers["X-DPP-Cost-Reserved"] = format_usd_micros(existing_run.reservation_max_cost_usd_micros)
                 response.headers["X-DPP-Cost-Minimum-Fee"] = format_usd_micros(existing_run.minimum_fee_usd_micros)
@@ -201,7 +213,11 @@ async def create_run(
     try:
         sqs_client = get_sqs_client()
         message_id = sqs_client.enqueue_run(run_id, tenant_id, request.pack_type)
-        logger.info(f"Enqueued run {run_id} to SQS (message_id={message_id})")
+        # P1-9: Include trace_id in logs
+        logger.info(
+            f"Enqueued run {run_id} to SQS (message_id={message_id})",
+            extra={"trace_id": run.trace_id} if run.trace_id else {},
+        )
 
     except Exception as e:
         logger.error(f"SQS enqueue failed for run {run_id}: {e}", exc_info=True)

@@ -1,14 +1,20 @@
 """DPP API - FastAPI Application Entry Point."""
 
+import logging
+import os
+import uuid
+
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from dpp_api.context import request_id_var
 from dpp_api.enforce import PlanViolationError
 from dpp_api.routers import health, runs, usage
 from dpp_api.schemas import ProblemDetail
+from dpp_api.utils import configure_json_logging
 
 app = FastAPI(
     title="DPP API",
@@ -18,6 +24,13 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# P1-9: Configure structured JSON logging
+# Set DPP_JSON_LOGS=false to disable (defaults to true for production)
+if os.getenv("DPP_JSON_LOGS", "true").lower() != "false":
+    configure_json_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
+    logger = logging.getLogger(__name__)
+    logger.info("Structured JSON logging enabled")
+
 # CORS middleware (adjust for production)
 app.add_middleware(
     CORSMiddleware,
@@ -26,6 +39,37 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ============================================================================
+# P1-9: Request ID Middleware
+# ============================================================================
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Generate and propagate request_id for observability.
+
+    P1-9: Each request gets a unique request_id (UUID v4).
+    - Accepts X-Request-ID header from client (optional)
+    - Generates new UUID if not provided
+    - Sets context variable for logging
+    - Returns X-Request-ID in response headers
+    """
+    # Get or generate request_id
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+
+    # Set context variable for logging
+    request_id_var.set(request_id)
+
+    # Process request
+    response = await call_next(request)
+
+    # Add request_id to response headers
+    response.headers["X-Request-ID"] = request_id
+
+    return response
+
 
 # ============================================================================
 # RFC 9457 Global Exception Handlers

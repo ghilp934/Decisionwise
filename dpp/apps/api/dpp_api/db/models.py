@@ -3,7 +3,7 @@
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import BIGINT, DATE, JSON, TEXT, TIMESTAMP, UUID, Index
+from sqlalchemy import BIGINT, DATE, FLOAT, JSON, TEXT, TIMESTAMP, UUID, Index
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -80,6 +80,11 @@ class Run(Base):
     reservation_max_cost_usd_micros: Mapped[int] = mapped_column(BIGINT, nullable=False)
     actual_cost_usd_micros: Mapped[Optional[int]] = mapped_column(BIGINT, nullable=True)
     minimum_fee_usd_micros: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
+
+    # P1-7: Reservation parameters and inputs
+    timebox_sec: Mapped[Optional[int]] = mapped_column(BIGINT, nullable=True)
+    min_reliability_score: Mapped[Optional[float]] = mapped_column(FLOAT, nullable=True)
+    inputs_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # Result persistence
     result_bucket: Mapped[Optional[str]] = mapped_column(TEXT, nullable=True)
