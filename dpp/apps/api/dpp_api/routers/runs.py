@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from dpp_api.auth.api_key import AuthContext, get_auth_context
 from dpp_api.budget import BudgetManager
+from dpp_api.context import run_id_var, tenant_id_var
 from dpp_api.db.models import Run
 from dpp_api.db.redis_client import RedisClient
 from dpp_api.db.repo_runs import RunRepository
@@ -51,6 +52,9 @@ async def create_run(
     - DEC-4212: SQS enqueue
     """
     tenant_id = auth.tenant_id
+
+    # MS-6: Set tenant_id in context for all subsequent logs
+    tenant_id_var.set(tenant_id)
 
     # Validate idempotency key
     if not idempotency_key or len(idempotency_key) < 8 or len(idempotency_key) > 64:
@@ -112,6 +116,9 @@ async def create_run(
 
     # Generate run_id
     run_id = str(uuid.uuid4())
+
+    # MS-6: Set run_id in context for all subsequent logs
+    run_id_var.set(run_id)
 
     # Create run record (status=QUEUED, money_state=NONE initially)
     retention_until = datetime.now(timezone.utc) + timedelta(days=30)
@@ -285,6 +292,10 @@ async def get_run(
     - DEC-4208: Cost headers
     """
     tenant_id = auth.tenant_id
+
+    # MS-6: Set context for all subsequent logs
+    tenant_id_var.set(tenant_id)
+    run_id_var.set(run_id)
 
     # P1-8: Rate limit check for polling
     redis_client = RedisClient.get_client()

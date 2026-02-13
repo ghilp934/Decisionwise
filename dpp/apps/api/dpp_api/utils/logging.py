@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from dpp_api.context import request_id_var
+from dpp_api.context import request_id_var, run_id_var, tenant_id_var
 
 
 class JSONFormatter(logging.Formatter):
@@ -25,8 +25,13 @@ class JSONFormatter(logging.Formatter):
     - func: function name
     - line: line number
     - request_id: from context variable (if available)
+    - run_id: from context variable (MS-6: CRITICAL for debugging)
+    - tenant_id: from context variable (MS-6: CRITICAL for debugging)
     - trace_id: from extra kwargs (if provided)
     - span_id: from extra kwargs (if provided)
+
+    MS-6: All logs automatically include run_id and tenant_id when set in context.
+    This enables 1-minute root cause analysis: "왜 터졌지?"
     """
 
     def format(self, record: logging.LogRecord) -> str:
@@ -47,6 +52,22 @@ class JSONFormatter(logging.Formatter):
                 log_data["request_id"] = request_id
         except LookupError:
             # Context variable not set (non-request context like worker/reaper)
+            pass
+
+        # MS-6: Add run_id from context variable (CRITICAL for debugging)
+        try:
+            run_id = run_id_var.get()
+            if run_id:
+                log_data["run_id"] = run_id
+        except LookupError:
+            pass
+
+        # MS-6: Add tenant_id from context variable (CRITICAL for debugging)
+        try:
+            tenant_id = tenant_id_var.get()
+            if tenant_id:
+                log_data["tenant_id"] = tenant_id
+        except LookupError:
             pass
 
         # P1-9: Add trace_id and span_id if provided via extra kwargs
