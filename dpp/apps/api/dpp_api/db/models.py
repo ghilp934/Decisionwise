@@ -102,6 +102,11 @@ class Run(Base):
         TIMESTAMP(timezone=True), nullable=True
     )
 
+    # P1-10: Completion timestamp
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
     # Error tracking
     last_error_reason_code: Mapped[Optional[str]] = mapped_column(TEXT, nullable=True)
     last_error_detail: Mapped[Optional[str]] = mapped_column(TEXT, nullable=True)

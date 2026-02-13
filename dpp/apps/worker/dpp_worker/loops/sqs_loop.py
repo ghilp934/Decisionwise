@@ -16,6 +16,8 @@ from dpp_worker.executor.stub_decision import StubDecisionExecutor
 from dpp_worker.finalize.optimistic_commit import (
     ClaimError,
     FinalizeError,
+    claim_finalize,
+    commit_finalize,
     finalize_failure,
     finalize_success,
 )
@@ -201,7 +203,24 @@ class WorkerLoop:
 
             sha256_hash = compute_envelope_sha256(envelope_json)
 
-            # 5. Upload to S3
+            # 5. PHASE 1: CLAIM (P0-2: Claim-Check pattern)
+            # CRITICAL: Claim BEFORE any side-effects (S3 upload)
+            try:
+                finalize_token, claimed_version = claim_finalize(
+                    run_id=run_id,
+                    tenant_id=tenant_id,
+                    extra_claim_conditions={"lease_token": lease_token},
+                    db=self.db,
+                )
+                logger.info(f"Run {run_id} claimed for finalize (token={finalize_token})")
+
+            except ClaimError as e:
+                logger.warning(f"Run {run_id} claim failed (LOSER): {e}")
+                # Another worker or reaper already finalized - this is OK
+                # Do NOT upload to S3 since we lost the race
+                return
+
+            # 6. PHASE 2: S3 UPLOAD (only after successful claim)
             # Key: dpp/{tenant_id}/{yyyy}/{mm}/{dd}/{run_id}/pack_envelope.json
             now = datetime.now(timezone.utc)
             s3_key = (
@@ -209,25 +228,35 @@ class WorkerLoop:
                 f"{run_id}/pack_envelope.json"
             )
 
-            self.s3.put_object(
-                Bucket=self.result_bucket,
-                Key=s3_key,
-                Body=envelope_json.encode("utf-8"),
-                ContentType="application/json; charset=utf-8",
-            )
-
-            logger.info(f"Uploaded result to s3://{self.result_bucket}/{s3_key}")
-
-            # 6. 2-phase finalize (SUCCESS)
             try:
-                result = finalize_success(
+                self.s3.put_object(
+                    Bucket=self.result_bucket,
+                    Key=s3_key,
+                    Body=envelope_json.encode("utf-8"),
+                    ContentType="application/json; charset=utf-8",
+                )
+                logger.info(f"Uploaded result to s3://{self.result_bucket}/{s3_key}")
+
+            except Exception as e:
+                logger.error(f"S3 upload failed after claim: {e}", exc_info=True)
+                # S3 upload failed after claim - run is stuck in CLAIMED state
+                # Reaper will eventually handle this
+                raise FinalizeError(f"S3 upload failed after claim: {e}")
+
+            # 7. PHASE 3: COMMIT (settle + final DB commit)
+            try:
+                result = commit_finalize(
                     run_id=run_id,
                     tenant_id=tenant_id,
-                    lease_token=lease_token,
-                    actual_cost_usd_micros=actual_cost_usd_micros,
-                    result_bucket=self.result_bucket,
-                    result_key=s3_key,
-                    result_sha256=sha256_hash,
+                    finalize_token=finalize_token,
+                    claimed_version=claimed_version,
+                    charge_usd_micros=actual_cost_usd_micros,
+                    final_status="COMPLETED",
+                    extra_final_updates={
+                        "result_bucket": self.result_bucket,
+                        "result_key": s3_key,
+                        "result_sha256": sha256_hash,
+                    },
                     db=self.db,
                     budget_manager=self.budget_manager,
                 )
@@ -235,16 +264,11 @@ class WorkerLoop:
                 if result == "WINNER":
                     logger.info(f"Run {run_id} finalized successfully (WINNER)")
                 else:
-                    logger.warning(f"Run {run_id} finalize lost race (LOSER)")
-
-            except ClaimError as e:
-                logger.warning(f"Run {run_id} claim failed (LOSER): {e}")
-                # Another worker or reaper already finalized - this is OK
-                return
+                    logger.warning(f"Run {run_id} finalize commit returned unexpected result")
 
             except FinalizeError as e:
-                logger.error(f"Run {run_id} finalize failed after claim: {e}")
-                # This is a problem - claim succeeded but side-effects failed
+                logger.error(f"Run {run_id} commit failed after claim and S3 upload: {e}")
+                # This is a problem - claim succeeded, S3 uploaded, but commit failed
                 # Reconciliation job will handle this
                 raise
 

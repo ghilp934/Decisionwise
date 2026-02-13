@@ -42,7 +42,8 @@ awslocal s3api put-bucket-lifecycle-configuration \
 echo "S3 bucket lifecycle policy set"
 
 # Create SQS queue
-QUEUE_NAME="dpp-runs-queue"
+# P1-11: Align with code defaults (dpp-runs, not dpp-runs-queue)
+QUEUE_NAME="dpp-runs"
 echo "Creating SQS queue: ${QUEUE_NAME}"
 QUEUE_URL=$(awslocal sqs create-queue --queue-name ${QUEUE_NAME} --attributes VisibilityTimeout=120,MessageRetentionPeriod=3600 --output text --query 'QueueUrl' || echo "")
 

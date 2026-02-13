@@ -12,7 +12,9 @@ from sqlalchemy.orm import Session
 
 from dpp_api.auth.api_key import AuthContext, get_auth_context
 from dpp_api.db.models import TenantUsageDaily
+from dpp_api.db.redis_client import RedisClient
 from dpp_api.db.session import get_db
+from dpp_api.enforce import PlanEnforcer
 from dpp_api.schemas import ProblemDetail, UsageDailySummary, UsageResponse
 
 router = APIRouter(prefix="/v1/tenants", tags=["usage"])
@@ -41,6 +43,12 @@ async def get_tenant_usage(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tenant not found",
         )
+
+    # P1-8: Rate limit check for usage API
+    redis_client = RedisClient.get_client()
+    plan_enforcer = PlanEnforcer(db, redis_client)
+    plan = plan_enforcer.get_active_plan(tenant_id)
+    plan_enforcer.check_rate_limit_poll(plan, tenant_id)
 
     # Parse and validate dates
     try:

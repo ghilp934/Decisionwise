@@ -49,41 +49,28 @@ class ClaimError(FinalizeError):
     pass
 
 
-def _do_2phase_finalize(
+def claim_finalize(
     run_id: str,
     tenant_id: str,
-    charge_usd_micros: int,
-    final_status: Literal["COMPLETED", "FAILED"],
     extra_claim_conditions: dict[str, Any],
-    extra_final_updates: dict[str, Any],
     db: Session,
-    budget_manager: BudgetManager,
-) -> Literal["WINNER"]:
-    """Internal 2-phase finalize implementation (polymorphic core).
+) -> tuple[str, int]:
+    """Phase 1: Claim exclusive right to finalize (Claim-Check pattern).
 
-    This is the common logic shared by Worker (success/failure) and Reaper (timeout).
-
-    Phase A (Claim): Acquire exclusive right to finalize using DB-CAS
-    Phase B (Side-effects - winner only): Settle budget + commit final state
+    CRITICAL: This MUST be called BEFORE any side-effects (S3 upload, settle).
 
     Args:
         run_id: Run ID
         tenant_id: Tenant ID
-        charge_usd_micros: Amount to charge (USD_MICROS)
-        final_status: Final status ("COMPLETED" or "FAILED")
         extra_claim_conditions: Extra WHERE conditions for claim
-                                (Worker: {"lease_token": token}, Reaper: {"lease_expires_at": ("lt", now)})
-        extra_final_updates: Extra fields to update in final commit
-                             (Worker: S3 pointers, Reaper: error details)
         db: Database session
-        budget_manager: Budget manager instance
 
     Returns:
-        "WINNER" if finalize succeeded
+        Tuple of (finalize_token, claimed_version)
 
     Raises:
-        ClaimError: If claim phase fails (loser)
-        FinalizeError: If commit phase fails after claiming
+        ClaimError: If claim fails (loser)
+        FinalizeError: If run state is invalid
     """
     repo = RunRepository(db)
 
@@ -97,20 +84,14 @@ def _do_2phase_finalize(
             f"Run {run_id} status is {run.status}, expected PROCESSING (already finalized)"
         )
 
-    # Golden Rule: Validate money_state before attempting settle
+    # Golden Rule: Validate money_state before attempting finalize
     if run.money_state != "RESERVED":
         raise FinalizeError(
             f"Run {run_id} money_state is {run.money_state}, expected RESERVED"
         )
 
-    # Pre-check: charge must not exceed reservation
-    if charge_usd_micros > run.reservation_max_cost_usd_micros:
-        raise FinalizeError(
-            f"Charge {charge_usd_micros} exceeds reserved {run.reservation_max_cost_usd_micros}"
-        )
-
     # ========================================
-    # PHASE A: CLAIM (DB-CAS)
+    # PHASE 1: CLAIM (DB-CAS) - NO SIDE-EFFECTS YET
     # ========================================
     finalize_token = str(uuid.uuid4())
     current_version = run.version
@@ -140,27 +121,78 @@ def _do_2phase_finalize(
         # Lost race - another worker or reaper already claimed
         raise ClaimError(f"Run {run_id} already claimed by another process")
 
-    # ========================================
-    # PHASE B: SIDE-EFFECTS (winner only)
-    # ========================================
+    claimed_version = current_version + 1
+    return (finalize_token, claimed_version)
 
-    # 1. Settle budget (charge, refund excess)
-    settle_status, charge, refund, new_balance = budget_manager.scripts.settle(
+
+def commit_finalize(
+    run_id: str,
+    tenant_id: str,
+    finalize_token: str,
+    claimed_version: int,
+    charge_usd_micros: int,
+    final_status: Literal["COMPLETED", "FAILED"],
+    extra_final_updates: dict[str, Any],
+    db: Session,
+    budget_manager: BudgetManager,
+) -> Literal["WINNER"]:
+    """Phase 2-3: Settle budget and commit final state (Claim-Check pattern).
+
+    CRITICAL: This should ONLY be called AFTER side-effects (S3 upload) are complete.
+
+    Args:
+        run_id: Run ID
+        tenant_id: Tenant ID
+        finalize_token: Token from claim phase
+        claimed_version: Version from claim phase
+        charge_usd_micros: Amount to charge (USD_MICROS)
+        final_status: Final status ("COMPLETED" or "FAILED")
+        extra_final_updates: Extra fields to update
+        db: Database session
+        budget_manager: Budget manager instance
+
+    Returns:
+        "WINNER" if finalize succeeded
+
+    Raises:
+        FinalizeError: If commit fails
+    """
+    repo = RunRepository(db)
+
+    # Get run for validation
+    run = repo.get_by_id(run_id, tenant_id)
+    if not run:
+        raise FinalizeError(f"Run {run_id} not found")
+
+    # Pre-check: charge must not exceed reservation
+    if charge_usd_micros > run.reservation_max_cost_usd_micros:
+        raise FinalizeError(
+            f"Charge {charge_usd_micros} exceeds reserved {run.reservation_max_cost_usd_micros}"
+        )
+
+    # ========================================
+    # PHASE 2: SETTLE (Redis)
+    # ========================================
+    settle_status, returned_charge, refund, new_balance = budget_manager.scripts.settle(
         tenant_id, run_id, charge_usd_micros
     )
 
     if settle_status != "OK":
         raise FinalizeError(f"Settle failed: {settle_status}")
 
-    # 2. Final DB commit
-    claimed_version = current_version + 1  # Version was incremented by claim
+    # P0-3: Use returned charge as single source of truth
+    actual_charge = returned_charge
 
+    # ========================================
+    # PHASE 3: FINAL COMMIT (DB)
+    # ========================================
     # Base final updates (common to all finalize types)
     final_updates = {
         "status": final_status,
         "money_state": "SETTLED",
-        "actual_cost_usd_micros": charge_usd_micros,
+        "actual_cost_usd_micros": actual_charge,  # P0-3: Use returned charge
         "finalize_stage": "COMMITTED",
+        "completed_at": datetime.now(timezone.utc),  # P1-10: Set completion timestamp
     }
     # Add extra updates (Worker: S3 pointers, Reaper: error details)
     final_updates.update(extra_final_updates)
@@ -191,13 +223,67 @@ def _do_2phase_finalize(
             usage_tracker.record_run_completion(updated_run)
         except Exception as e:
             # Log metering error but don't fail finalize (already committed)
-            # Metering is important but not critical for finalize success
             import logging
 
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to record usage for run {run_id}: {e}", exc_info=True)
 
     return "WINNER"
+
+
+def _do_2phase_finalize(
+    run_id: str,
+    tenant_id: str,
+    charge_usd_micros: int,
+    final_status: Literal["COMPLETED", "FAILED"],
+    extra_claim_conditions: dict[str, Any],
+    extra_final_updates: dict[str, Any],
+    db: Session,
+    budget_manager: BudgetManager,
+) -> Literal["WINNER"]:
+    """Internal 2-phase finalize implementation (polymorphic core).
+
+    NOTE: This is a legacy wrapper for backward compatibility.
+    New code should use claim_finalize() + side-effects + commit_finalize() pattern.
+
+    Args:
+        run_id: Run ID
+        tenant_id: Tenant ID
+        charge_usd_micros: Amount to charge (USD_MICROS)
+        final_status: Final status ("COMPLETED" or "FAILED")
+        extra_claim_conditions: Extra WHERE conditions for claim
+        extra_final_updates: Extra fields to update in final commit
+        db: Database session
+        budget_manager: Budget manager instance
+
+    Returns:
+        "WINNER" if finalize succeeded
+
+    Raises:
+        ClaimError: If claim phase fails (loser)
+        FinalizeError: If commit phase fails after claiming
+    """
+    # Phase 1: Claim
+    finalize_token, claimed_version = claim_finalize(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        extra_claim_conditions=extra_claim_conditions,
+        db=db,
+    )
+
+    # Phase 2-3: Settle + Commit
+    # (In this legacy function, no S3 upload happens between claim and commit)
+    return commit_finalize(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        finalize_token=finalize_token,
+        claimed_version=claimed_version,
+        charge_usd_micros=charge_usd_micros,
+        final_status=final_status,
+        extra_final_updates=extra_final_updates,
+        db=db,
+        budget_manager=budget_manager,
+    )
 
 
 def finalize_success(

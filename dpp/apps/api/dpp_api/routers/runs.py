@@ -4,7 +4,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from dpp_api.auth.api_key import AuthContext, get_auth_context
@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 @router.post("", response_model=RunReceipt, status_code=status.HTTP_202_ACCEPTED)
 async def create_run(
     request: RunCreateRequest,
+    response: Response,
     auth: AuthContext = Depends(get_auth_context),
     idempotency_key: str = Header(..., alias="Idempotency-Key"),
     db: Session = Depends(get_db),
@@ -69,6 +70,11 @@ async def create_run(
         # Idempotency: Return existing run if hash matches
         if existing_run.payload_hash == payload_hash:
             logger.info(f"Idempotent request for run {existing_run.run_id}")
+            # P1-6: Add cost headers
+            response.headers["X-DPP-Cost-Reserved"] = format_usd_micros(existing_run.reservation_max_cost_usd_micros)
+            response.headers["X-DPP-Cost-Minimum-Fee"] = format_usd_micros(existing_run.minimum_fee_usd_micros)
+            if existing_run.actual_cost_usd_micros is not None:
+                response.headers["X-DPP-Cost-Actual"] = format_usd_micros(existing_run.actual_cost_usd_micros)
             return _build_receipt(existing_run)
         else:
             # Hash mismatch - different payload with same key
@@ -81,31 +87,21 @@ async def create_run(
     max_cost_usd_micros = parse_usd_string(request.reservation.max_cost_usd)
 
     # STEP B: Plan enforcement (API monetization)
-    try:
-        redis_client = RedisClient.get_client()
-        plan_enforcer = PlanEnforcer(db, redis_client)
-        plan_enforcer.enforce(
-            tenant_id=tenant_id,
-            pack_type=request.pack_type,
-            max_cost_usd_micros=max_cost_usd_micros,
-        )
-    except PlanViolationError as e:
-        # DEC-4213: Return RFC 9457 Problem Detail
-        raise HTTPException(
-            status_code=e.status_code,
-            detail=ProblemDetail(
-                type=e.error_type,
-                title=e.title,
-                status=e.status_code,
-                detail=e.detail,
-                instance=f"/v1/runs",
-            ).model_dump(),
-        )
+    # PlanViolationError is handled by global exception handler (RFC 9457)
+    redis_client = RedisClient.get_client()
+    plan_enforcer = PlanEnforcer(db, redis_client)
+    plan_enforcer.enforce(
+        tenant_id=tenant_id,
+        pack_type=request.pack_type,
+        max_cost_usd_micros=max_cost_usd_micros,
+    )
 
     # Calculate minimum fee (DEC-4203)
     # minimum_fee = max(0.005, 0.02 * reserved_usd), cap <= 0.10
+    # P0-4: CRITICAL - minimum_fee must NEVER exceed reserved
     minimum_fee_usd_micros = min(
         max(5_000, int(max_cost_usd_micros * 0.02)),
+        max_cost_usd_micros,  # P0-4: Cannot exceed reservation
         100_000,  # Cap at $0.10
     )
 
@@ -142,6 +138,11 @@ async def create_run(
             existing_run = repo.get_by_idempotency_key(tenant_id, idempotency_key)
             if existing_run and existing_run.payload_hash == payload_hash:
                 logger.info(f"Race: Returning existing run {existing_run.run_id}")
+                # P1-6: Add cost headers
+                response.headers["X-DPP-Cost-Reserved"] = format_usd_micros(existing_run.reservation_max_cost_usd_micros)
+                response.headers["X-DPP-Cost-Minimum-Fee"] = format_usd_micros(existing_run.minimum_fee_usd_micros)
+                if existing_run.actual_cost_usd_micros is not None:
+                    response.headers["X-DPP-Cost-Actual"] = format_usd_micros(existing_run.actual_cost_usd_micros)
                 return _build_receipt(existing_run)
             else:
                 raise HTTPException(
@@ -196,17 +197,28 @@ async def create_run(
         )
 
     # Enqueue to SQS (DEC-4212)
+    # P0-5: Transaction Script pattern - if enqueue fails, rollback DB and refund
     try:
         sqs_client = get_sqs_client()
         message_id = sqs_client.enqueue_run(run_id, tenant_id, request.pack_type)
         logger.info(f"Enqueued run {run_id} to SQS (message_id={message_id})")
 
     except Exception as e:
-        logger.error(f"SQS enqueue failed for run {run_id}: {e}")
+        logger.error(f"SQS enqueue failed for run {run_id}: {e}", exc_info=True)
 
-        # Enqueue failed - refund and mark as failed
-        budget_manager.scripts.refund_full(tenant_id, run_id)
+        # P0-5: CRITICAL - Refund reserved funds (Transaction Script rollback)
+        try:
+            refund_result = budget_manager.scripts.refund_full(tenant_id, run_id)
+            logger.info(f"Refunded {refund_result} micros for run {run_id} after enqueue failure")
+        except Exception as refund_error:
+            logger.error(
+                f"CRITICAL: Refund failed after enqueue failure for run {run_id}: {refund_error}",
+                exc_info=True,
+            )
+            # Continue to mark run as FAILED even if refund fails
+            # Manual reconciliation will be needed
 
+        # P0-5: Update DB with error details so GET shows failure reason
         repo.update_with_version_check(
             run_id=run_id,
             tenant_id=tenant_id,
@@ -219,10 +231,17 @@ async def create_run(
             },
         )
 
+        # P0-5: Re-raise as 500 Internal Server Error per Auditor's guide
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Failed to enqueue run",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to enqueue run: {str(e)[:100]}",
         )
+
+    # P1-6: Add X-DPP-* cost headers (DEC-4208)
+    response.headers["X-DPP-Cost-Reserved"] = format_usd_micros(run.reservation_max_cost_usd_micros)
+    response.headers["X-DPP-Cost-Minimum-Fee"] = format_usd_micros(run.minimum_fee_usd_micros)
+    if run.actual_cost_usd_micros is not None:
+        response.headers["X-DPP-Cost-Actual"] = format_usd_micros(run.actual_cost_usd_micros)
 
     # Success - return receipt
     return _build_receipt(run)
@@ -231,6 +250,7 @@ async def create_run(
 @router.get("/{run_id}", response_model=RunStatusResponse)
 async def get_run(
     run_id: str,
+    response: Response,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
@@ -243,6 +263,12 @@ async def get_run(
     - DEC-4208: Cost headers
     """
     tenant_id = auth.tenant_id
+
+    # P1-8: Rate limit check for polling
+    redis_client = RedisClient.get_client()
+    plan_enforcer = PlanEnforcer(db, redis_client)
+    plan = plan_enforcer.get_active_plan(tenant_id)
+    plan_enforcer.check_rate_limit_poll(plan, tenant_id)
 
     # Get run from DB
     repo = RunRepository(db)
@@ -302,6 +328,12 @@ async def get_run(
             reason_code=run.last_error_reason_code or "UNKNOWN",
             detail=run.last_error_detail or "Run failed",
         )
+
+    # P1-6: Add X-DPP-* cost headers (DEC-4208)
+    response.headers["X-DPP-Cost-Reserved"] = format_usd_micros(run.reservation_max_cost_usd_micros)
+    response.headers["X-DPP-Cost-Minimum-Fee"] = format_usd_micros(run.minimum_fee_usd_micros)
+    if run.actual_cost_usd_micros is not None:
+        response.headers["X-DPP-Cost-Actual"] = format_usd_micros(run.actual_cost_usd_micros)
 
     return RunStatusResponse(
         run_id=run.run_id,

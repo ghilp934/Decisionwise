@@ -114,8 +114,22 @@ class PlanEnforcer:
             requested_max_cost_usd_micros: Requested max cost in USD micros
 
         Raises:
-            PlanViolationError: If max_cost exceeds limit (402)
+            PlanViolationError: If max_cost exceeds limit (402) or below minimum (400)
         """
+        # P0-4: Enforce minimum max_cost to ensure minimum_fee never exceeds reserved
+        # minimum_fee = max($0.005, 0.02 * reserved), so reserved must be >= $0.005
+        MINIMUM_MAX_COST_USD_MICROS = 5_000  # $0.005
+
+        if requested_max_cost_usd_micros < MINIMUM_MAX_COST_USD_MICROS:
+            raise PlanViolationError(
+                status_code=400,
+                error_type="https://api.dpp.example/problems/max-cost-too-low",
+                title="Maximum Cost Too Low",
+                detail=f"Requested max_cost ({requested_max_cost_usd_micros} micros) "
+                f"is below minimum ({MINIMUM_MAX_COST_USD_MICROS} micros). "
+                f"Minimum reservation is $0.005 to cover minimum fee.",
+            )
+
         limits = plan.limits_json or {}
         pack_type_limits = limits.get("pack_type_limits", {})
         pack_limit = pack_type_limits.get(pack_type, {})
@@ -175,6 +189,55 @@ class PlanEnforcer:
                 error_type="https://api.dpp.example/problems/rate-limit-exceeded",
                 title="Rate Limit Exceeded",
                 detail=f"Rate limit of {rate_limit_post_per_min} POST /runs per minute exceeded. "
+                f"Retry after {ttl} seconds.",
+            )
+
+        # Increment count
+        self.redis.incr(rate_key)
+
+    def check_rate_limit_poll(self, plan: Plan, tenant_id: str) -> None:
+        """Check rate limit for GET /runs/{id} polling using Redis.
+
+        P1-8: Rate limiting for GET endpoints to prevent excessive polling.
+
+        Args:
+            plan: Active Plan object
+            tenant_id: Tenant ID
+
+        Raises:
+            PlanViolationError: If rate limit exceeded (429 with Retry-After)
+        """
+        limits = plan.limits_json or {}
+        rate_limit_poll_per_min = limits.get("rate_limit_poll_per_min")
+
+        if rate_limit_poll_per_min is None:
+            # No rate limit configured
+            return
+
+        # Redis key for rate limiting
+        rate_key = f"rate_limit:poll_runs:{tenant_id}"
+
+        # Get current count
+        current_count = self.redis.get(rate_key)
+
+        if current_count is None:
+            # First request in this window
+            pipe = self.redis.pipeline()
+            pipe.incr(rate_key)
+            pipe.expire(rate_key, 60)  # 60 seconds TTL
+            pipe.execute()
+            return
+
+        current_count = int(current_count)
+
+        if current_count >= rate_limit_poll_per_min:
+            # Rate limit exceeded
+            ttl = self.redis.ttl(rate_key)
+            raise PlanViolationError(
+                status_code=429,
+                error_type="https://api.dpp.example/problems/rate-limit-exceeded",
+                title="Rate Limit Exceeded",
+                detail=f"Rate limit of {rate_limit_poll_per_min} GET /runs polling per minute exceeded. "
                 f"Retry after {ttl} seconds.",
             )
 
