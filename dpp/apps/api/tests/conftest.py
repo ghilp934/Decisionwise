@@ -1,14 +1,25 @@
 """Pytest configuration and fixtures."""
 
+import hashlib
 import os
+import uuid
+from unittest.mock import MagicMock, patch
 
 import pytest
 import redis
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from dpp_api.db.models import Base
+from dpp_api.budget.redis_scripts import BudgetScripts
+from dpp_api.db.models import APIKey, Base, Plan, Tenant
+from dpp_api.db.redis_client import RedisClient
+from dpp_api.db.repo_api_keys import APIKeyRepository
+from dpp_api.db.repo_plans import TenantPlanRepository
+from dpp_api.db.repo_tenants import TenantRepository
+from dpp_api.db.session import get_db
+from dpp_api.main import app
 
 # Use PostgreSQL for monetization tests (BIGINT autoincrement requires PostgreSQL)
 # Set to "sqlite:///:memory:" for fast unit tests
@@ -93,3 +104,116 @@ def redis_client() -> redis.Redis:
         # Clean up after test
         client.flushdb()
         client.close()
+
+
+@pytest.fixture
+def mock_sqs_client():
+    """Mock SQS client to avoid LocalStack dependency in tests."""
+    with patch("dpp_api.routers.runs.get_sqs_client") as mock_get_sqs:
+        mock_client = MagicMock()
+        mock_client.enqueue_run.return_value = "mock-message-id-123"
+        mock_get_sqs.return_value = mock_client
+        yield mock_client
+
+
+@pytest.fixture
+def test_client(db_session: Session, mock_sqs_client):
+    """TestClient with db_session dependency override and mocked SQS."""
+
+    def override_get_db():
+        try:
+            yield db_session
+        finally:
+            pass  # Don't close - conftest will handle it
+
+    app.dependency_overrides[get_db] = override_get_db
+    client = TestClient(app)
+    yield client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def basic_plan(db_session: Session) -> Plan:
+    """Create a basic plan for E2E tests (cleanup existing if present)."""
+    plan_id = "plan_e2e_basic"
+
+    # Delete existing if present
+    existing = db_session.query(Plan).filter_by(plan_id=plan_id).first()
+    if existing:
+        db_session.delete(existing)
+        db_session.commit()
+
+    plan = Plan(
+        plan_id=plan_id,
+        name="E2E Basic Plan",
+        status="ACTIVE",
+        default_profile_version="v0.4.2.2",
+        features_json={
+            "allowed_pack_types": ["decision", "url", "ocr", "video"],
+            "max_concurrent_runs": 50,
+        },
+        limits_json={
+            "rate_limit_post_per_min": 1000,  # High limit for E2E tests
+            "rate_limit_poll_per_min": 10000,
+            "pack_type_limits": {
+                "decision": {"max_cost_usd_micros": 10_000_000},  # $10.00
+                "url": {"max_cost_usd_micros": 10_000_000},
+                "ocr": {"max_cost_usd_micros": 10_000_000},
+                "video": {"max_cost_usd_micros": 10_000_000},
+            },
+        },
+    )
+    db_session.add(plan)
+    db_session.commit()
+    db_session.refresh(plan)
+    return plan
+
+
+@pytest.fixture
+def test_tenant_with_api_key(db_session: Session, basic_plan: Plan) -> tuple[str, str, str]:
+    """Create a test tenant with API key and budget.
+
+    Returns:
+        Tuple of (tenant_id, api_key, key_hash)
+    """
+    tenant_id = f"tenant_{uuid.uuid4().hex[:8]}"
+    key_id = str(uuid.uuid4())
+    secret = uuid.uuid4().hex
+    api_key = f"sk_{key_id}_{secret}"
+
+    # Hash the key
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+
+    # Create tenant
+    tenant_repo = TenantRepository(db_session)
+    tenant_repo.create(
+        Tenant(tenant_id=tenant_id, display_name=f"Test Tenant {tenant_id}", status="ACTIVE")
+    )
+
+    # Create API key
+    api_key_repo = APIKeyRepository(db_session)
+    api_key_repo.create(
+        APIKey(
+            key_id=key_id,
+            tenant_id=tenant_id,
+            key_hash=key_hash,
+            label="Test Key",
+            status="ACTIVE",
+        )
+    )
+
+    # Assign plan to tenant
+    tenant_plan_repo = TenantPlanRepository(db_session)
+    tenant_plan_repo.assign_plan(
+        tenant_id=tenant_id,
+        plan_id=basic_plan.plan_id,
+        changed_by="e2e_test",
+        change_reason="E2E test setup",
+    )
+
+    # Set budget
+    redis_client = RedisClient.get_client()
+    budget_scripts = BudgetScripts(redis_client)
+    budget_scripts.set_balance(tenant_id, 10_000_000)  # $10.00
+
+    return (tenant_id, api_key, key_hash)
