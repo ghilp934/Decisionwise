@@ -428,7 +428,8 @@ def finalize_timeout(
         final_status="FAILED",
         extra_claim_conditions={
             # Reaper doesn't check lease_token (lease expired)
-            # finalize_stage IS NULL is sufficient race protection
+            # But we ensure run is still in PROCESSING state
+            "status": "PROCESSING",  # Additional safety check
         },
         extra_final_updates={
             "last_error_reason_code": "WORKER_TIMEOUT",

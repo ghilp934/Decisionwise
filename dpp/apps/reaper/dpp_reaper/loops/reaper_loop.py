@@ -7,6 +7,8 @@ Spec 10.1, 10.2: Reaper Service
 """
 
 import logging
+import signal
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -17,9 +19,24 @@ from sqlalchemy.orm import Session
 from dpp_api.budget import BudgetManager
 from dpp_api.db.models import Run
 from dpp_api.db.redis_client import RedisClient
-from dpp_worker.finalize.optimistic_commit import ClaimError, finalize_timeout
+from dpp_worker.finalize.optimistic_commit import ClaimError, FinalizeError, finalize_timeout
 
 logger = logging.getLogger(__name__)
+
+# Global shutdown event for graceful termination
+_shutdown_event = threading.Event()
+
+
+def _signal_handler(signum, frame):
+    """Handle shutdown signals (SIGTERM, SIGINT) gracefully."""
+    sig_name = signal.Signals(signum).name
+    logger.info(f"Received {sig_name} signal, initiating graceful shutdown...")
+    _shutdown_event.set()
+
+
+# Register signal handlers
+signal.signal(signal.SIGTERM, _signal_handler)
+signal.signal(signal.SIGINT, _signal_handler)
 
 
 def scan_expired_runs(db: Session, limit: int = 100) -> list[Run]:
@@ -53,9 +70,12 @@ def scan_expired_runs(db: Session, limit: int = 100) -> list[Run]:
     runs = result.scalars().all()
 
     if runs:
-        logger.info(f"Reaper scan found {len(runs)} expired runs")
+        logger.info(
+            f"Reaper scan found {len(runs)} expired runs",
+            extra={"expired_count": len(runs), "scan_limit": limit},
+        )
 
-    return list(runs)
+    return runs  # scalars().all() already returns list
 
 
 def reap_run(
@@ -103,19 +123,43 @@ def reap_run(
 
         logger.info(
             f"Reaper WINNER: Terminated zombie run {run_id}, "
-            f"charged {charge_usd_micros} micros"
+            f"charged {charge_usd_micros} micros",
+            extra={
+                "run_id": run_id,
+                "tenant_id": tenant_id,
+                "charge_usd_micros": charge_usd_micros,
+                "outcome": "success",
+            },
         )
         return True
 
     except ClaimError as e:
         # Lost race - Worker or another Reaper already claimed
         # This is expected and normal - just log and move on
-        logger.debug(f"Reaper lost race for run {run_id}: {e}")
+        logger.debug(
+            f"Reaper lost race for run {run_id}: {e}",
+            extra={"run_id": run_id, "outcome": "lost_race"},
+        )
+        return False
+
+    except FinalizeError as e:
+        # Critical finalize error after claim (should be rare)
+        # Log and return False - run will be retried in next iteration
+        logger.error(
+            f"Reaper finalize error for run {run_id} (will retry): {e}",
+            exc_info=True,
+            extra={"run_id": run_id, "outcome": "finalize_error"},
+        )
         return False
 
     except Exception as e:
-        # Unexpected error (DB issue, budget issue, etc.)
-        logger.error(f"Reaper failed to terminate run {run_id}: {e}", exc_info=True)
+        # Unexpected error (DB connection, Redis timeout, etc.)
+        # Log with full traceback and return False for retry
+        logger.error(
+            f"Reaper unexpected error for run {run_id} (will retry): {e}",
+            exc_info=True,
+            extra={"run_id": run_id, "outcome": "unexpected_error"},
+        )
         return False
 
 
@@ -152,11 +196,18 @@ def reaper_loop(
     )
 
     iteration = 0
-    while True:
+    total_reaped = 0
+    total_scanned = 0
+
+    while not _shutdown_event.is_set():
         iteration += 1
+        iteration_start = time.time()
         logger.debug(f"Reaper iteration {iteration} starting")
 
         try:
+            # Clear session cache to prevent stale data in long-running process
+            db.expire_all()
+
             # Scan for expired runs
             expired_runs = scan_expired_runs(db, limit=limit_per_scan)
 
@@ -174,10 +225,26 @@ def reaper_loop(
                     else:
                         losses += 1
 
+                # Update totals
+                total_reaped += wins
+                total_scanned += len(expired_runs)
+
+                # Calculate iteration duration
+                duration_ms = int((time.time() - iteration_start) * 1000)
+
                 logger.info(
                     f"Reaper iteration {iteration}: "
                     f"{wins} reaped, {losses} lost races, "
-                    f"{len(expired_runs)} total scanned"
+                    f"{len(expired_runs)} total scanned",
+                    extra={
+                        "iteration": iteration,
+                        "wins": wins,
+                        "losses": losses,
+                        "scanned": len(expired_runs),
+                        "duration_ms": duration_ms,
+                        "total_reaped": total_reaped,
+                        "total_scanned": total_scanned,
+                    },
                 )
 
         except Exception as e:
@@ -188,6 +255,19 @@ def reaper_loop(
             logger.info("Reaper loop stopping after one iteration (test mode)")
             break
 
-        # Sleep before next scan
+        # Interruptible sleep - allows immediate shutdown on signal
         logger.debug(f"Reaper sleeping for {interval_seconds}s")
-        time.sleep(interval_seconds)
+        _shutdown_event.wait(interval_seconds)
+
+    # Graceful shutdown summary
+    logger.info(
+        f"Reaper loop stopped gracefully after {iteration} iterations",
+        extra={
+            "total_iterations": iteration,
+            "total_reaped": total_reaped,
+            "total_scanned": total_scanned,
+            "success_rate": round(total_reaped / total_scanned * 100, 2)
+            if total_scanned > 0
+            else 0,
+        },
+    )
