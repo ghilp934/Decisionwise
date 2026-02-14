@@ -1,0 +1,14 @@
+# Decisionwise API
+
+> Agent-centric decision execution platform with idempotent metering, RFC 9457 error handling, and IETF RateLimit headers.
+
+## Primary Resources
+
+- OpenAPI Spec: /.well-known/openapi.json
+- Quickstart: /docs/quickstart.md
+- Authentication: /docs/auth.md
+- Rate Limits: /docs/rate-limits.md
+- Problem Types (RFC 9457): /docs/problem-types.md
+- Metering & Billing: /docs/metering-billing.md
+- Pricing SSoT: /docs/pricing-ssot.md | /pricing/ssot.json
+- Changelog: /docs/changelog.md

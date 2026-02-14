@@ -1,13 +1,16 @@
 """DPP API - FastAPI Application Entry Point."""
 
+import json
 import logging
 import os
 import uuid
+from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from dpp_api.context import request_id_var
@@ -17,11 +20,12 @@ from dpp_api.schemas import ProblemDetail
 from dpp_api.utils import configure_json_logging
 
 app = FastAPI(
-    title="DPP API",
-    description="Decision Pack Platform - Agent-Centric API Platform",
+    title="Decisionwise API",
+    description="Agent-centric decision execution platform with idempotent metering, RFC 9457 error handling, and IETF RateLimit headers.",
     version="0.4.2.2",
-    docs_url="/docs",
+    docs_url="/api-docs",  # MTS-3: Moved to /api-docs to free /docs for documentation
     redoc_url="/redoc",
+    openapi_version="3.1.0",  # MTS-3: Locked to OpenAPI 3.1.0
 )
 
 # P1-9: Configure structured JSON logging
@@ -221,11 +225,82 @@ app.include_router(runs.router)  # API-01: Runs endpoints
 app.include_router(usage.router)  # STEP D: Usage analytics
 
 
+# ============================================================================
+# MTS-3: AI-Friendly Documentation Endpoints
+# ============================================================================
+
+
+@app.get("/.well-known/openapi.json")
+async def well_known_openapi():
+    """
+    OpenAPI 3.1.0 specification endpoint.
+
+    MTS-3.0-DOC: Provides machine-readable API specification at well-known location.
+    Returns: OpenAPI 3.1.0 JSON schema
+    """
+    return JSONResponse(content=app.openapi())
+
+
+@app.get("/pricing/ssot.json")
+async def pricing_ssot():
+    """
+    Canonical Pricing Single Source of Truth (SSoT).
+
+    MTS-3.0-DOC: Provides machine-readable pricing configuration.
+    Returns: Pricing SSoT v0.2.1 JSON
+    """
+    # Load SSoT from canonical file
+    ssot_path = Path(__file__).parent / "pricing" / "fixtures" / "pricing_ssot.json"
+
+    try:
+        with open(ssot_path, "r", encoding="utf-8") as f:
+            ssot_data = json.load(f)
+        return JSONResponse(content=ssot_data)
+    except FileNotFoundError:
+        # Return 500 with ProblemDetails if SSoT file is missing
+        problem = ProblemDetail(
+            type="https://iana.org/assignments/http-problem-types#internal-error",
+            title="Pricing SSoT Not Found",
+            status=500,
+            detail="Pricing configuration file not found. Contact support.",
+        )
+        return JSONResponse(
+            status_code=500,
+            content=problem.model_dump(exclude_none=True),
+            media_type="application/problem+json",
+        )
+    except json.JSONDecodeError:
+        # Return 500 with ProblemDetails if SSoT file is malformed
+        problem = ProblemDetail(
+            type="https://iana.org/assignments/http-problem-types#internal-error",
+            title="Pricing SSoT Parse Error",
+            status=500,
+            detail="Pricing configuration file is malformed. Contact support.",
+        )
+        return JSONResponse(
+            status_code=500,
+            content=problem.model_dump(exclude_none=True),
+            media_type="application/problem+json",
+        )
+
+
 @app.get("/")
 async def root() -> dict[str, str]:
     """Root endpoint."""
     return {
-        "service": "DPP API",
+        "service": "Decisionwise API",
         "version": "0.4.2.2",
         "status": "running",
+        "docs": "/llms.txt",
     }
+
+
+# ============================================================================
+# MTS-3: Static File Serving (llms.txt, docs)
+# ============================================================================
+
+# Mount static files last (after all routes)
+# This serves /public directory at root path
+public_dir = Path(__file__).parent.parent.parent.parent / "public"
+if public_dir.exists():
+    app.mount("/", StaticFiles(directory=str(public_dir), html=True), name="static")

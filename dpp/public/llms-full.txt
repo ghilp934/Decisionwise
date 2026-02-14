@@ -1,0 +1,37 @@
+# Decisionwise API
+
+> Agent-centric decision execution platform with idempotent metering, RFC 9457 error handling, and IETF RateLimit headers.
+
+## Primary Resources
+
+- **OpenAPI Spec**: /.well-known/openapi.json
+  OpenAPI 3.1.0 machine-readable API specification with JSON Schema 2020-12 support.
+
+- **Quickstart**: /docs/quickstart.md
+  curl examples for 200/422/429 responses, authentication headers, and idempotency rules.
+
+- **Authentication**: /docs/auth.md
+  API Key authentication (X-API-Key header). 401/403 responses are non-billable.
+
+- **Rate Limits**: /docs/rate-limits.md
+  IETF draft-ietf-httpapi-ratelimit-headers compliant. RateLimit-Policy and RateLimit headers on all responses. Retry-After on 429.
+
+- **Problem Types (RFC 9457)**: /docs/problem-types.md
+  application/problem+json responses for errors. quota-exceeded, budget-exceeded, invalid-request, unauthorized, forbidden types.
+
+- **Metering & Billing**: /docs/metering-billing.md
+  Billable: 2xx + 422 only. Non-billable: 400/401/403/404/409/412/413/415/429/5xx. Idempotency prevents duplicate charges.
+
+- **Pricing SSoT**: /docs/pricing-ssot.md | /pricing/ssot.json
+  Canonical pricing configuration (v0.2.1). Tier limits, DC quotas, overage caps, RPM limits. Machine-readable JSON.
+
+- **Changelog**: /docs/changelog.md
+  Document version history with breaking change markers.
+
+## Agent Integration Hints
+
+- **Auth Header**: `X-API-Key: dw_live_xxx` (or dw_test_xxx for sandbox)
+- **Idempotency**: Include unique `run_id` in request body. Same (workspace_id, run_id) charged only once (45-day retention).
+- **Billability**: Only 2xx and 422 responses are billable. All errors (400/401/403/404/429/5xx) are non-billable.
+- **429 Handling**: Check `violated-policies` array in Problem Details. Respect `Retry-After` header (seconds). Exponential backoff recommended.
+- **RateLimit Headers**: Parse `RateLimit-Policy` and `RateLimit` headers. Format: `limit, remaining, reset` per IETF draft.
