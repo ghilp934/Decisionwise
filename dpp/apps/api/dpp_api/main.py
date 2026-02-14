@@ -413,8 +413,8 @@ def custom_openapi():
     openapi_schema["components"]["securitySchemes"]["BearerAuth"] = {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "API Key",
-        "description": "API Key in format: sk_{environment}_{key_id}_{secret} (e.g., sk_live_abc123_xyz789...)",
+        "bearerFormat": "opaque-token",
+        "description": "Bearer token in format: sk_{environment}_{key_id}_{secret} (e.g., sk_live_abc123_xyz789...)",
     }
 
     # Apply security globally
@@ -506,7 +506,7 @@ async def function_calling_specs():
         "auth": {
             "type": "http",
             "scheme": "bearer",
-            "bearer_format": "API Key",
+            "bearer_format": "opaque-token",
             "format": "sk_{environment}_{key_id}_{secret} (e.g., sk_live_*, sk_test_*)",
             "docs": f"{base_url}/docs/auth.md",
         },

@@ -14,15 +14,15 @@ Decisionproof API is available at the following endpoints:
 
 ## Authentication
 
-Include your API key in the `Authorization` header with `Bearer` scheme:
+Include your bearer token in the `Authorization` header with `Bearer` scheme:
 
 ```bash
 Authorization: Bearer sk_live_abc123_xyz789...
 ```
 
-API Key Format: `sk_{environment}_{key_id}_{secret}`
-- Live keys: `sk_live_*`
-- Test keys: `sk_test_*`
+Token Format: `sk_{environment}_{key_id}_{secret}`
+- Live tokens: `sk_live_*`
+- Test tokens: `sk_test_*`
 
 ## Example Requests
 
