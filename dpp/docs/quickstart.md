@@ -2,10 +2,15 @@
 
 ## Base URL
 
-```
-Production: https://api.decisionwise.ai
-Sandbox:    https://sandbox-api.decisionwise.ai
-```
+Decisionwise API is available at the following endpoints:
+
+| Environment | Base URL | Description |
+|-------------|----------|-------------|
+| **Production** | `https://api.decisionwise.ai` | Live environment with real billing |
+| **Sandbox** | `https://sandbox-api.decisionwise.ai` | Testing environment (test keys: `dw_test_*`) |
+| **Local** | `http://localhost:8000` | Development server |
+
+**Note**: Base URLs are configurable via environment variables (`API_BASE_URL`, `API_SANDBOX_URL`). Always verify the endpoint from the [OpenAPI spec](/.well-known/openapi.json) `servers` field.
 
 ## Authentication
 

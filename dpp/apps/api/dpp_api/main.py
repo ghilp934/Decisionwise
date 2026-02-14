@@ -19,6 +19,10 @@ from dpp_api.routers import health, runs, usage
 from dpp_api.schemas import ProblemDetail
 from dpp_api.utils import configure_json_logging
 
+# MTS-3.1: Base URL from environment variables
+base_url = os.getenv("API_BASE_URL", "https://api.decisionwise.ai")
+sandbox_url = os.getenv("API_SANDBOX_URL", "https://sandbox-api.decisionwise.ai")
+
 app = FastAPI(
     title="Decisionwise API",
     description="Agent-centric decision execution platform with idempotent metering, RFC 9457 error handling, and IETF RateLimit headers.",
@@ -26,6 +30,11 @@ app = FastAPI(
     docs_url="/api-docs",  # MTS-3: Moved to /api-docs to free /docs for documentation
     redoc_url="/redoc",
     openapi_version="3.1.0",  # MTS-3: Locked to OpenAPI 3.1.0
+    servers=[
+        {"url": base_url, "description": "Production"},
+        {"url": sandbox_url, "description": "Sandbox"},
+        {"url": "http://localhost:8000", "description": "Local development"},
+    ],
 )
 
 # P1-9: Configure structured JSON logging
@@ -86,6 +95,40 @@ async def request_id_middleware(request: Request, call_next):
 
     # Add request_id to response headers
     response.headers["X-Request-ID"] = request_id
+
+    return response
+
+
+# ============================================================================
+# MTS-3.3: Static File Caching Middleware
+# ============================================================================
+
+
+@app.middleware("http")
+async def static_cache_middleware(request: Request, call_next):
+    """
+    Add Cache-Control headers for static files.
+
+    MTS-3.3: Performance optimization for documentation and llms.txt.
+    - /llms.txt, /llms-full.txt: max-age=300 (5 minutes)
+    - /docs/*.md: max-age=3600 (1 hour)
+    - /.well-known/openapi.json: max-age=300 (5 minutes)
+    - /pricing/ssot.json: max-age=300 (5 minutes)
+    """
+    response = await call_next(request)
+
+    # Apply caching based on path
+    path = request.url.path
+
+    if path in ["/llms.txt", "/llms-full.txt", "/.well-known/openapi.json", "/pricing/ssot.json"]:
+        # Short cache for frequently updated files (5 minutes)
+        response.headers["Cache-Control"] = "public, max-age=300"
+    elif path.startswith("/docs/") and path.endswith(".md"):
+        # Longer cache for documentation (1 hour)
+        response.headers["Cache-Control"] = "public, max-age=3600"
+    elif path.startswith("/docs/") or path.startswith("/public/"):
+        # Default cache for other static files (1 hour)
+        response.headers["Cache-Control"] = "public, max-age=3600"
 
     return response
 
@@ -223,6 +266,139 @@ def _get_title_for_status(status_code: int) -> str:
 app.include_router(health.router, tags=["health"])
 app.include_router(runs.router)  # API-01: Runs endpoints
 app.include_router(usage.router)  # STEP D: Usage analytics
+
+
+# ============================================================================
+# MTS-3.2: OpenAPI Schema Customization (Examples)
+# ============================================================================
+
+
+def custom_openapi():
+    """
+    Customize OpenAPI schema with request/response examples.
+
+    MTS-3.2: Adds practical examples for AI/Agent integration.
+    """
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    # Import get_openapi to avoid recursion
+    from fastapi.openapi.utils import get_openapi
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        servers=app.servers,
+    )
+
+    # Add example for POST /v1/runs (200 Success)
+    if "/v1/runs" in openapi_schema.get("paths", {}):
+        post_runs = openapi_schema["paths"]["/v1/runs"].get("post", {})
+
+        # Request example
+        if "requestBody" in post_runs:
+            post_runs["requestBody"]["content"]["application/json"]["example"] = {
+                "workspace_id": "ws_abc123",
+                "run_id": "run_unique_001",
+                "plan_id": "plan_xyz789",
+                "input": {"question": "What is 2+2?"},
+            }
+
+        # Response examples
+        if "responses" not in post_runs:
+            post_runs["responses"] = {}
+
+        # 202 Accepted (Success)
+        post_runs["responses"]["202"] = {
+            "description": "Run accepted and queued for execution",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "run_id": "run_unique_001",
+                        "status": "queued",
+                        "poll_url": "/v1/runs/run_unique_001",
+                        "estimated_cost": "0.15 USD",
+                    }
+                }
+            },
+        }
+
+        # 422 Unprocessable Entity (Billable error)
+        post_runs["responses"]["422"] = {
+            "description": "Invalid plan configuration (billable)",
+            "content": {
+                "application/problem+json": {
+                    "example": {
+                        "type": "https://iana.org/assignments/http-problem-types#unprocessable-entity",
+                        "title": "Unprocessable Entity",
+                        "status": 422,
+                        "detail": "Plan 'plan_invalid' does not exist",
+                    }
+                }
+            },
+        }
+
+        # 429 Rate Limit Exceeded (Non-billable)
+        post_runs["responses"]["429"] = {
+            "description": "Rate limit or quota exceeded (non-billable)",
+            "content": {
+                "application/problem+json": {
+                    "example": {
+                        "type": "https://iana.org/assignments/http-problem-types#quota-exceeded",
+                        "title": "Request cannot be satisfied as assigned quota has been exceeded",
+                        "status": 429,
+                        "detail": "RPM limit of 600 requests per minute exceeded",
+                        "violated-policies": [
+                            {
+                                "policy": "rpm",
+                                "limit": 600,
+                                "current": 601,
+                                "window_seconds": 60,
+                            }
+                        ],
+                    }
+                }
+            },
+        }
+
+    # Add example for GET /pricing/ssot.json
+    if "/pricing/ssot.json" in openapi_schema.get("paths", {}):
+        get_ssot = openapi_schema["paths"]["/pricing/ssot.json"].get("get", {})
+
+        if "responses" not in get_ssot:
+            get_ssot["responses"] = {}
+
+        get_ssot["responses"]["200"] = {
+            "description": "Canonical Pricing SSoT v0.2.1",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "pricing_version": "2026-02-14.v0.2.1",
+                        "effective_from": "2026-03-01T00:00:00Z",
+                        "currency": {"code": "KRW", "symbol": "₩"},
+                        "tiers": [
+                            {
+                                "tier": "STARTER",
+                                "monthly_base_price": 29000,
+                                "included_dc_per_month": 1000,
+                                "limits": {
+                                    "rate_limit_rpm": 600,
+                                    "monthly_quota_dc": 2000,
+                                },
+                            }
+                        ],
+                    }
+                }
+            },
+        }
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
 
 
 # ============================================================================
