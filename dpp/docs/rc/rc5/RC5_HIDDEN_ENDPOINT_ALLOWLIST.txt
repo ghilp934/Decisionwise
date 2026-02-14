@@ -1,0 +1,11 @@
+# RC-5 Hidden Endpoint Allowlist
+# Format: METHOD PATH
+# Example:
+#   GET /internal/metrics
+#   POST /admin/reindex
+
+# FastAPI Built-in Documentation Endpoints (intentionally hidden from OpenAPI)
+GET /api-docs
+GET /docs/oauth2-redirect
+GET /openapi.json
+GET /redoc

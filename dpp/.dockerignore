@@ -1,0 +1,49 @@
+# Python cache and artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# Development artifacts
+*.log
+*.backup
+*.bak
+*.swp
+*.swo
+*~
+
+# Secrets and sensitive files
+.env
+.env.*
+*.pem
+*.key
+id_rsa*
+*.p12
+*.pfx
+credentials.json
+
+# Test directories (not needed in production)
+tests/
+**/tests/
+
+# Development-only directories
+.git/
+.github/
+.vscode/
+.idea/
+docs/
+scripts/rc*
+rc*_*.py
+
+# Local development files
+*.local
+.DS_Store
+Thumbs.db
