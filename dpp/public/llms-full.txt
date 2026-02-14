@@ -1,4 +1,4 @@
-# Decisionwise API
+# Decisionproof API
 
 > Agent-centric decision execution platform with idempotent metering, RFC 9457 error handling, and IETF RateLimit headers.
 

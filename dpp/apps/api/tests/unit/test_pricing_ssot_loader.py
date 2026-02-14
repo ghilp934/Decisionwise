@@ -208,9 +208,9 @@ class TestMeterConfiguration:
     """Test meter configuration for Decision Credits (DC)."""
 
     def test_meter_event_name(self):
-        """Meter event name should be 'decisionwise.dc'."""
+        """Meter event name should be 'decisionproof.dc'."""
         ssot = load_pricing_ssot()
-        assert ssot.meter.event_name == "decisionwise.dc"
+        assert ssot.meter.event_name == "decisionproof.dc"
 
     def test_meter_idempotency(self):
         """Meter should use run_id for idempotency with workspace_id scope."""

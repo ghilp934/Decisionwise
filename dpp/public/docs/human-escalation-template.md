@@ -9,7 +9,7 @@ When AI agents or automated systems encounter decisions requiring human approval
 **Subject**: 🔑 API Key & Workspace Access Approval Required
 
 **Context**:
-An automated agent or integration requires access to the Decisionwise API to execute decision workflows on your behalf.
+An automated agent or integration requires access to the Decisionproof API to execute decision workflows on your behalf.
 
 **Estimated Cost**:
 - **Setup**: Free (API keys are generated at no charge)
@@ -32,16 +32,16 @@ An automated agent or integration requires access to the Decisionwise API to exe
 
 **Action Required**:
 1. Review the request details above
-2. If approved, visit: [Decisionwise Dashboard - API Keys](https://app.decisionwise.ai/settings/api-keys)
+2. If approved, visit: [Decisionproof Dashboard - API Keys](https://app.decisionproof.ai/settings/api-keys)
 3. Click "Generate New API Key"
 4. Select workspace: `[WORKSPACE_NAME]`
 5. Copy the key and provide it to the requesting agent/integration (store securely)
-6. Monitor usage at: [Usage Dashboard](https://app.decisionwise.ai/usage)
+6. Monitor usage at: [Usage Dashboard](https://app.decisionproof.ai/usage)
 
 **Next Steps**:
-- Approve: Generate key and proceed → [API Keys Dashboard](https://app.decisionwise.ai/settings/api-keys)
+- Approve: Generate key and proceed → [API Keys Dashboard](https://app.decisionproof.ai/settings/api-keys)
 - Reject: No action needed
-- Questions: Contact support → [Support](https://decisionwise.ai/support)
+- Questions: Contact support → [Support](https://decisionproof.ai/support)
 
 **Reference Documentation**:
 - [Authentication Guide](/docs/auth.md)
@@ -90,20 +90,20 @@ Current usage patterns indicate the workspace will exceed the current monthly bu
 
 **Action Required**:
 1. Review the request details above
-2. If approved, visit: [Billing Settings](https://app.decisionwise.ai/settings/billing)
+2. If approved, visit: [Billing Settings](https://app.decisionproof.ai/settings/billing)
 3. Navigate to "Monthly Budget Cap" section
 4. Update cap to: $[REQUESTED_CAP]
 5. Confirm change and save
 
 **Next Steps**:
-- Approve: Update cap immediately → [Billing Settings](https://app.decisionwise.ai/settings/billing)
-- Approve with conditions: Adjust to different amount → [Billing Settings](https://app.decisionwise.ai/settings/billing)
+- Approve: Update cap immediately → [Billing Settings](https://app.decisionproof.ai/settings/billing)
+- Approve with conditions: Adjust to different amount → [Billing Settings](https://app.decisionproof.ai/settings/billing)
 - Reject: Current cap remains; agent will receive 429 errors when exceeded
-- Questions: Contact support → [Support](https://decisionwise.ai/support)
+- Questions: Contact support → [Support](https://decisionproof.ai/support)
 
 **Monitoring**:
-- Real-time usage: [Usage Dashboard](https://app.decisionwise.ai/usage)
-- Alerts: Configure notifications at [Alert Settings](https://app.decisionwise.ai/settings/alerts)
+- Real-time usage: [Usage Dashboard](https://app.decisionproof.ai/usage)
+- Alerts: Configure notifications at [Alert Settings](https://app.decisionproof.ai/settings/alerts)
   - Recommended: Set alert at 80% of cap
   - Recommended: Set alert at 95% of cap
 
@@ -144,15 +144,15 @@ Current rate limit tier is insufficient for projected request volume. Agent requ
 
 **Action Required**:
 1. Review the request details above
-2. If approved, visit: [Billing Settings](https://app.decisionwise.ai/settings/billing)
+2. If approved, visit: [Billing Settings](https://app.decisionproof.ai/settings/billing)
 3. Navigate to "Tier & Rate Limits" section
 4. Select new tier: [REQUESTED_TIER]
 5. Confirm change and save
 
 **Next Steps**:
-- Approve: Upgrade tier → [Billing Settings](https://app.decisionwise.ai/settings/billing)
+- Approve: Upgrade tier → [Billing Settings](https://app.decisionproof.ai/settings/billing)
 - Reject: Current tier remains; agent will receive 429 errors during peaks
-- Questions: Contact support → [Support](https://decisionwise.ai/support)
+- Questions: Contact support → [Support](https://decisionproof.ai/support)
 
 **Reference Documentation**:
 - [Rate Limits](/docs/rate-limits.md)

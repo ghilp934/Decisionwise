@@ -13,7 +13,7 @@ from .models import PricingSSoTModel
 
 class MeteringEvent(BaseModel):
     """Metering event payload"""
-    event_name: str = "decisionwise.dc"
+    event_name: str = "decisionproof.dc"
     workspace_id: str
     run_id: str  # Idempotency key
     dc_amount: int

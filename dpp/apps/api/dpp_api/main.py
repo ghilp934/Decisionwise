@@ -20,11 +20,11 @@ from dpp_api.schemas import ProblemDetail
 from dpp_api.utils import configure_json_logging
 
 # MTS-3.1: Base URL from environment variables
-base_url = os.getenv("API_BASE_URL", "https://api.decisionwise.ai")
-sandbox_url = os.getenv("API_SANDBOX_URL", "https://sandbox-api.decisionwise.ai")
+base_url = os.getenv("API_BASE_URL", "https://api.decisionproof.ai")
+sandbox_url = os.getenv("API_SANDBOX_URL", "https://sandbox-api.decisionproof.ai")
 
 app = FastAPI(
-    title="Decisionwise API",
+    title="Decisionproof API",
     description="Agent-centric decision execution platform with idempotent metering, RFC 9457 error handling, and IETF RateLimit headers.",
     version="0.4.2.2",
     docs_url="/api-docs",  # MTS-3: Moved to /api-docs to free /docs for documentation
@@ -471,7 +471,7 @@ async def function_calling_specs():
     from datetime import datetime, timezone
 
     # Derive base URL from environment or default
-    base_url = os.getenv("API_BASE_URL", "https://api.decisionwise.ai")
+    base_url = os.getenv("API_BASE_URL", "https://api.decisionproof.ai")
 
     spec = {
         "spec_version": "2026-02-14.v0.2.0",
@@ -615,7 +615,7 @@ async def function_calling_specs():
 async def root() -> dict[str, str]:
     """Root endpoint."""
     return {
-        "service": "Decisionwise API",
+        "service": "Decisionproof API",
         "version": "0.4.2.2",
         "status": "running",
         "docs": "/llms.txt",

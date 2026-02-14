@@ -2,7 +2,7 @@
 
 ## Canonical Pricing Configuration
 
-Decisionwise pricing is defined in a **machine-readable JSON** file:
+Decisionproof pricing is defined in a **machine-readable JSON** file:
 
 **Endpoint**: [/pricing/ssot.json](/pricing/ssot.json)
 
@@ -38,7 +38,7 @@ All prices are in Korean Won (KRW) with tax exclusive.
 
 ## Tiers
 
-Decisionwise offers 4 pricing tiers: **SANDBOX**, **STARTER**, **GROWTH**, **ENTERPRISE**.
+Decisionproof offers 4 pricing tiers: **SANDBOX**, **STARTER**, **GROWTH**, **ENTERPRISE**.
 
 ### Tier Structure
 
@@ -95,7 +95,7 @@ Example: ENTERPRISE tier has `rate_limit_rpm: 0` = unlimited requests per minute
 
 ## Grace Overage
 
-Decisionwise allows a small **grace overage** to prevent hard stops:
+Decisionproof allows a small **grace overage** to prevent hard stops:
 
 ```json
 {
@@ -118,7 +118,7 @@ Example: STARTER tier (hard_overage_dc_cap=1000) → grace = min(10 DC, 100 DC) 
 ```json
 {
   "meter": {
-    "event_name": "decisionwise.dc",
+    "event_name": "decisionproof.dc",
     "quantity_field": "dc_amount",
     "idempotency_key_field": "run_id",
     "idempotency_retention_days": 45

@@ -17,7 +17,7 @@
     ]
   },
   "meter": {
-    "event_name": "decisionwise.dc",
+    "event_name": "decisionproof.dc",
     "quantity_field": "dc_amount",
     "idempotency_key_field": "run_id",
     "aggregation": "sum",

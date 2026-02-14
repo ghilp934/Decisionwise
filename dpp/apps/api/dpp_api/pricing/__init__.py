@@ -1,5 +1,5 @@
 """
-Decisionwise Pricing Module
+Decisionproof Pricing Module
 MTS-2 Monetization System
 """
 

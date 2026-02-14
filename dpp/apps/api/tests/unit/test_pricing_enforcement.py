@@ -32,7 +32,7 @@ def mock_ssot_with_tiers():
             "applies_to_fields": ["monthly_quota_dc", "rate_limit_rpm", "hard_overage_dc_cap"]
         },
         meter={
-            "event_name": "decisionwise.dc",
+            "event_name": "decisionproof.dc",
             "quantity_field": "dc_amount",
             "idempotency_key_field": "run_id",
             "aggregation": "sum",

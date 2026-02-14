@@ -2,7 +2,7 @@
 
 ## Overview
 
-Decisionwise supports delegated authentication for scenarios where agents or applications act on behalf of users without direct credential sharing.
+Decisionproof supports delegated authentication for scenarios where agents or applications act on behalf of users without direct credential sharing.
 
 ## OAuth 2.0 (RFC 6749)
 
@@ -12,8 +12,8 @@ OAuth 2.0 is the recommended baseline approach for delegated authentication.
 
 **Use case**: Web applications with user interaction
 
-1. User clicks "Connect Decisionwise"
-2. Redirect to Decisionwise authorization endpoint
+1. User clicks "Connect Decisionproof"
+2. Redirect to Decisionproof authorization endpoint
 3. User approves access
 4. Redirect back with authorization code
 5. Exchange code for access token
@@ -21,7 +21,7 @@ OAuth 2.0 is the recommended baseline approach for delegated authentication.
 
 **Example Authorization URL:**
 ```
-https://auth.decisionwise.ai/oauth/authorize?
+https://auth.decisionproof.ai/oauth/authorize?
   client_id=your_client_id&
   redirect_uri=https://yourapp.com/callback&
   response_type=code&
@@ -37,7 +37,7 @@ https://auth.decisionwise.ai/oauth/authorize?
 
 **Example Token Request:**
 ```bash
-curl -X POST https://auth.decisionwise.ai/oauth/token \
+curl -X POST https://auth.decisionproof.ai/oauth/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials" \
   -d "client_id=your_client_id" \
@@ -53,7 +53,7 @@ curl -X POST https://auth.decisionwise.ai/oauth/token \
 
 1. **Device requests user code:**
 ```bash
-POST https://auth.decisionwise.ai/oauth/device/code
+POST https://auth.decisionproof.ai/oauth/device/code
 {
   "client_id": "your_client_id",
   "scope": "runs:read runs:write"
@@ -65,8 +65,8 @@ POST https://auth.decisionwise.ai/oauth/device/code
 {
   "device_code": "GmRhmhcxhwEzkoEqiMEg_DnyEysNkuNhszIySk9eS",
   "user_code": "WDJB-MJHT",
-  "verification_uri": "https://decisionwise.ai/activate",
-  "verification_uri_complete": "https://decisionwise.ai/activate?user_code=WDJB-MJHT",
+  "verification_uri": "https://decisionproof.ai/activate",
+  "verification_uri_complete": "https://decisionproof.ai/activate?user_code=WDJB-MJHT",
   "expires_in": 900,
   "interval": 5
 }
@@ -76,7 +76,7 @@ POST https://auth.decisionwise.ai/oauth/device/code
 
 4. **Device polls for token:**
 ```bash
-POST https://auth.decisionwise.ai/oauth/token
+POST https://auth.decisionproof.ai/oauth/token
 {
   "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
   "device_code": "GmRhmhcxhwEzkoEqiMEg_DnyEysNkuNhszIySk9eS",
@@ -104,7 +104,7 @@ import requests
 def device_auth_flow(client_id):
     # 1. Request device code
     resp = requests.post(
-        "https://auth.decisionwise.ai/oauth/device/code",
+        "https://auth.decisionproof.ai/oauth/device/code",
         json={"client_id": client_id, "scope": "runs:read runs:write"}
     )
     device_data = resp.json()
@@ -123,7 +123,7 @@ def device_auth_flow(client_id):
         time.sleep(interval)
 
         token_resp = requests.post(
-            "https://auth.decisionwise.ai/oauth/token",
+            "https://auth.decisionproof.ai/oauth/token",
             json={
                 "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
                 "device_code": device_code,
@@ -160,7 +160,7 @@ def device_auth_flow(client_id):
 Once you have an access token, use it in API requests:
 
 ```bash
-curl -X POST https://api.decisionwise.ai/v1/runs \
+curl -X POST https://api.decisionproof.ai/v1/runs \
   -H "Authorization: Bearer eyJhbGc..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -178,7 +178,7 @@ curl -X POST https://api.decisionwise.ai/v1/runs \
 ### Refresh Tokens
 
 ```bash
-POST https://auth.decisionwise.ai/oauth/token
+POST https://auth.decisionproof.ai/oauth/token
 {
   "grant_type": "refresh_token",
   "refresh_token": "def502...",
@@ -189,7 +189,7 @@ POST https://auth.decisionwise.ai/oauth/token
 ### Token Revocation
 
 ```bash
-POST https://auth.decisionwise.ai/oauth/revoke
+POST https://auth.decisionproof.ai/oauth/revoke
 {
   "token": "eyJhbGc...",
   "client_id": "your_client_id"
@@ -210,4 +210,4 @@ POST https://auth.decisionwise.ai/oauth/revoke
 - [RFC 6749: OAuth 2.0 Framework](https://www.rfc-editor.org/rfc/rfc6749.html)
 - [RFC 8628: Device Authorization Grant](https://www.rfc-editor.org/rfc/rfc8628.html)
 - [RFC 7636: PKCE](https://www.rfc-editor.org/rfc/rfc7636.html)
-- [Decisionwise API Authentication](/docs/auth.md)
+- [Decisionproof API Authentication](/docs/auth.md)

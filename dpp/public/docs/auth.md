@@ -2,7 +2,7 @@
 
 ## API Key Authentication
 
-Decisionwise uses API keys for authentication. Include your API key in the `X-API-Key` header:
+Decisionproof uses API keys for authentication. Include your API key in the `X-API-Key` header:
 
 ```http
 X-API-Key: dw_live_abc123...
@@ -16,7 +16,7 @@ X-API-Key: dw_live_abc123...
 ### Example Request
 
 ```bash
-curl -X GET https://api.decisionwise.ai/v1/health \
+curl -X GET https://api.decisionproof.ai/v1/health \
   -H "X-API-Key: dw_live_abc123..."
 ```
 

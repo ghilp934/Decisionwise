@@ -1,7 +1,7 @@
-# MTS-2 Implementation Spec: Decisionwise Monetization System
+# MTS-2 Implementation Spec: Decisionproof Monetization System
 ## SSoT v0.2.1 Enforcement + RFC 9457 Problem Details + RateLimit Headers
 
-**Project**: Decisionwise API Platform
+**Project**: Decisionproof API Platform
 **Version**: v0.2.1
 **Date**: 2026-02-14
 **Status**: Implementation Ready
@@ -10,7 +10,7 @@
 
 ## 📋 Overview
 
-**Goal**: Implement complete monetization system based on Decisionwise_Pricing_SSoT_v0_2_1.md
+**Goal**: Implement complete monetization system based on Decisionproof_Pricing_SSoT_v0_2_1.md
 
 **Key Components**:
 1. SSoT Loader + Validator (JSON Schema validation)
@@ -95,7 +95,7 @@ class UnlimitedSemanticsModel(BaseModel):
     applies_to_fields: List[str]
 
 class MeterModel(BaseModel):
-    event_name: str = "decisionwise.dc"
+    event_name: str = "decisionproof.dc"
     quantity_field: str = "dc_amount"
     idempotency_key_field: str = "run_id"
     aggregation: Literal["sum", "count", "max"]
@@ -201,7 +201,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 class MeteringEvent(BaseModel):
-    event_name: str = "decisionwise.dc"
+    event_name: str = "decisionproof.dc"
     workspace_id: str
     run_id: str  # Idempotency key
     dc_amount: int

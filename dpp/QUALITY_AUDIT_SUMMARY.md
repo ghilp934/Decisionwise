@@ -71,7 +71,7 @@ grep -r "ws_[a-zA-Z0-9]{15,}" docs/                 # No matches
 ### 6️⃣ AI/Agent 통합 관점 (5/5 PASS)
 
 **llms.txt 구조**:
-- ✅ 명확한 제목 ("Decisionwise API")
+- ✅ 명확한 제목 ("Decisionproof API")
 - ✅ 8개 primary links (명확한 경로)
 - ✅ 블록쿼트 요약 제공
 
@@ -114,7 +114,7 @@ apps/api/tests/unit/test_doc_endpoints.py::TestDocumentationEndpoints (3 tests)
 ## 개선 권장사항 (선택적)
 
 ### 1. Base URL 환경변수화 (OPTIONAL)
-**현재**: 문서에 `https://api.decisionwise.ai` 하드코딩  
+**현재**: 문서에 `https://api.decisionproof.ai` 하드코딩  
 **권장**: 배포 시 환경변수로 동적 생성  
 **우선순위**: LOW (문서 작성 시점 기준 URL 사용 중)
 
@@ -182,7 +182,7 @@ MTS-3.0-DOC 패치는 다음을 충족합니다:
 **검수자**: Claude Sonnet 4.5  
 **일시**: 2026-02-14 11:05:00 UTC  
 **Git Commit**: ded4777 (MTS-3.0-DOC: AI-friendly documentation implementation)  
-**Repository**: https://github.com/ghilp934/Decisionwise.git
+**Repository**: https://github.com/ghilp934/Decisionproof.git
 
 ---
 

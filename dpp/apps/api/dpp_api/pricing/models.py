@@ -1,5 +1,5 @@
 """
-Pydantic models for Decisionwise Pricing SSoT v0.2.1
+Pydantic models for Decisionproof Pricing SSoT v0.2.1
 """
 
 from pydantic import BaseModel, Field
@@ -22,7 +22,7 @@ class UnlimitedSemanticsModel(BaseModel):
 
 class MeterModel(BaseModel):
     """Metering configuration"""
-    event_name: str = "decisionwise.dc"
+    event_name: str = "decisionproof.dc"
     quantity_field: str = "dc_amount"
     idempotency_key_field: str = "run_id"
     aggregation: Literal["sum", "count", "max"]

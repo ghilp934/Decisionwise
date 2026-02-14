@@ -2,12 +2,12 @@
 
 ## Base URL
 
-Decisionwise API is available at the following endpoints:
+Decisionproof API is available at the following endpoints:
 
 | Environment | Base URL | Description |
 |-------------|----------|-------------|
-| **Production** | `https://api.decisionwise.ai` | Live environment with real billing |
-| **Sandbox** | `https://sandbox-api.decisionwise.ai` | Testing environment (test keys: `dw_test_*`) |
+| **Production** | `https://api.decisionproof.ai` | Live environment with real billing |
+| **Sandbox** | `https://sandbox-api.decisionproof.ai` | Testing environment (test keys: `dw_test_*`) |
 | **Local** | `http://localhost:8000` | Development server |
 
 **Note**: Base URLs are configurable via environment variables (`API_BASE_URL`, `API_SANDBOX_URL`). Always verify the endpoint from the [OpenAPI spec](/.well-known/openapi.json) `servers` field.
@@ -30,7 +30,7 @@ Sandbox keys use `dw_test_` prefix.
 <summary><strong>cURL</strong></summary>
 
 ```bash
-curl -X POST https://api.decisionwise.ai/v1/runs \
+curl -X POST https://api.decisionproof.ai/v1/runs \
   -H "X-API-Key: dw_live_abc123..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -49,7 +49,7 @@ curl -X POST https://api.decisionwise.ai/v1/runs \
 import requests
 
 response = requests.post(
-    "https://api.decisionwise.ai/v1/runs",
+    "https://api.decisionproof.ai/v1/runs",
     headers={
         "X-API-Key": "dw_live_abc123...",
         "Content-Type": "application/json"
@@ -71,7 +71,7 @@ print(f"Result: {response.json()}")
 <summary><strong>Node.js</strong></summary>
 
 ```javascript
-const response = await fetch("https://api.decisionwise.ai/v1/runs", {
+const response = await fetch("https://api.decisionproof.ai/v1/runs", {
   method: "POST",
   headers: {
     "X-API-Key": "dw_live_abc123...",
@@ -101,7 +101,7 @@ console.log(`Result:`, data);
 <summary><strong>cURL</strong></summary>
 
 ```bash
-curl -X POST https://api.decisionwise.ai/v1/runs \
+curl -X POST https://api.decisionproof.ai/v1/runs \
   -H "X-API-Key: dw_live_abc123..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -120,7 +120,7 @@ curl -X POST https://api.decisionwise.ai/v1/runs \
 import requests
 
 response = requests.post(
-    "https://api.decisionwise.ai/v1/runs",
+    "https://api.decisionproof.ai/v1/runs",
     headers={
         "X-API-Key": "dw_live_abc123...",
         "Content-Type": "application/json"
@@ -146,7 +146,7 @@ if response.status_code == 422:
 <summary><strong>Node.js</strong></summary>
 
 ```javascript
-const response = await fetch("https://api.decisionwise.ai/v1/runs", {
+const response = await fetch("https://api.decisionproof.ai/v1/runs", {
   method: "POST",
   headers: {
     "X-API-Key": "dw_live_abc123...",
@@ -180,7 +180,7 @@ if (response.status === 422) {
 
 ```bash
 # After exceeding 600 requests/minute (STARTER tier)
-curl -X POST https://api.decisionwise.ai/v1/runs \
+curl -X POST https://api.decisionproof.ai/v1/runs \
   -H "X-API-Key: dw_live_abc123..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -200,7 +200,7 @@ import requests
 import time
 
 response = requests.post(
-    "https://api.decisionwise.ai/v1/runs",
+    "https://api.decisionproof.ai/v1/runs",
     headers={
         "X-API-Key": "dw_live_abc123...",
         "Content-Type": "application/json"
@@ -230,7 +230,7 @@ if response.status_code == 429:
 <summary><strong>Node.js</strong></summary>
 
 ```javascript
-const response = await fetch("https://api.decisionwise.ai/v1/runs", {
+const response = await fetch("https://api.decisionproof.ai/v1/runs", {
   method: "POST",
   headers: {
     "X-API-Key": "dw_live_abc123...",

@@ -1,6 +1,6 @@
 # Problem Types (RFC 9457)
 
-Decisionwise uses [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457.html) for structured error responses.
+Decisionproof uses [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457.html) for structured error responses.
 
 ## Problem Details Format
 
@@ -26,11 +26,11 @@ All error responses use `application/problem+json` content type with standard fi
 
 ### Extension Fields
 
-Decisionwise adds extension fields for specific problem types:
+Decisionproof adds extension fields for specific problem types:
 
 - **violated-policies**: Array of policy violations (quota-exceeded, budget-exceeded)
 
-## Decisionwise Problem Types
+## Decisionproof Problem Types
 
 ### quota-exceeded (429)
 

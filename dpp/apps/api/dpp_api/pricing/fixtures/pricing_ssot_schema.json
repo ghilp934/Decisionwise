@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Decisionwise Pricing SSoT Schema v0.2.1",
-  "description": "JSON Schema for Decisionwise Pricing Single Source of Truth",
+  "title": "Decisionproof Pricing SSoT Schema v0.2.1",
+  "description": "JSON Schema for Decisionproof Pricing Single Source of Truth",
   "type": "object",
   "required": [
     "pricing_version",

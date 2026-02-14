@@ -2,7 +2,7 @@
 
 ## Billable Status Codes
 
-Decisionwise charges Decision Credits (DC) only for successful executions and business logic errors:
+Decisionproof charges Decision Credits (DC) only for successful executions and business logic errors:
 
 ### Billable (2xx + 422)
 
@@ -34,7 +34,7 @@ All client errors (except 422) and server errors are **non-billable**:
 
 ## Idempotency (Duplicate Charge Prevention)
 
-Decisionwise prevents duplicate charges using **idempotent metering**.
+Decisionproof prevents duplicate charges using **idempotent metering**.
 
 ### How It Works
 

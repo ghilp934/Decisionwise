@@ -1,6 +1,6 @@
 # Rate Limits
 
-Decisionwise implements IETF draft-ietf-httpapi-ratelimit-headers compliant rate limiting.
+Decisionproof implements IETF draft-ietf-httpapi-ratelimit-headers compliant rate limiting.
 
 ## RateLimit Headers
 

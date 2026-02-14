@@ -27,7 +27,7 @@ class ProblemDetails(BaseModel):
     - instance: URI reference identifying the specific occurrence
     
     Extension fields:
-    - violated_policies: List of violated policies (Decisionwise extension)
+    - violated_policies: List of violated policies (Decisionproof extension)
     """
     type: str
     title: str

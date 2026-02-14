@@ -3,7 +3,7 @@
 ## Overview
 This document summarizes the implementation of the MTS-2 Monetization System based on:
 - Implementation Spec: MTS-2_IMPLEMENTATION_SPEC.md
-- SSoT Version: v0.2.1 (Decisionwise_Pricing_SSoT_v0_2_1.md)
+- SSoT Version: v0.2.1 (Decisionproof_Pricing_SSoT_v0_2_1.md)
 
 ## Files Created
 

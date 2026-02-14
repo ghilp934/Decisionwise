@@ -66,13 +66,13 @@ class TestLLMsLinkIntegrity:
         """GET /llms.txt should return 200."""
         response = client.get("/llms.txt")
         assert response.status_code == 200
-        assert "Decisionwise" in response.text
+        assert "Decisionproof" in response.text
 
     def test_llms_full_txt_accessible(self, client):
         """GET /llms-full.txt should return 200."""
         response = client.get("/llms-full.txt")
         assert response.status_code == 200
-        assert "Decisionwise" in response.text
+        assert "Decisionproof" in response.text
 
     def test_llms_txt_links_valid(self, client):
         """All links in llms.txt should be accessible or return intentional errors."""

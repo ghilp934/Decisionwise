@@ -1,0 +1,106 @@
+=== MTS-3.0-DOC 품질 검수 보고서 ===
+검수 일시: 2026-02-14
+검수자: Claude Sonnet 4.5
+
+## 1. 엔드포인트 동작 검증
+[PASS] /.well-known/openapi.json - 200 OK, OpenAPI 3.1.0
+[PASS] /pricing/ssot.json - 200 OK, v0.2.1
+[PASS] /llms.txt - 200 OK
+[PASS] /llms-full.txt - 200 OK
+[PASS] / (root) - 200 OK, docs 링크 포함
+
+## 2. 링크 무결성 검증
+[PASS] llms.txt 링크 무결성 테스트 통과 (3/3)
+[PASS] 모든 문서 링크 접근 가능 또는 의도된 404
+
+## 3. 보안 점검
+[REVIEW NEEDED] API 키 예제:
+- docs/quickstart.md: "dw_live_abc123..." (placeholder - OK)
+- docs/auth.md: "dw_live_abc123..." (placeholder - OK)
+- public/llms-full.txt: "dw_live_xxx" (placeholder - OK)
+
+[PASS] 실제 API 키 노출 없음 (grep 검색 결과)
+[PASS] PII 포함 없음
+[PASS] 실제 고객 데이터 없음
+
+## 4. SSoT 일치성 검증
+[MANUAL CHECK] docs/pricing-ssot.md vs pricing_ssot.json:
+- pricing_version: 문서에 "2026-02-14.v0.2.1" 언급 - OK
+- Tiers: 4개 (SANDBOX, STARTER, GROWTH, ENTERPRISE) - OK
+- Currency: KRW - OK
+- Grace overage: min(1%, 100 DC) - OK
+
+[NOTE] docs/rate-limits.md의 tier별 RPM 한도:
+- SANDBOX: 60 RPM
+- STARTER: 600 RPM
+- GROWTH: 3000 RPM
+- ENTERPRISE: Unlimited (0 = unlimited)
+
+이 값들은 SSoT를 참조하도록 안내됨 (수기 테이블 회피) - OK
+
+## 5. 문서 정확성 검증
+[PASS] Billability 규칙 일치:
+- docs/metering-billing.md: "2xx + 422 billable"
+- SSoT billing_rules: {"success": true, "http_422": true}
+
+[PASS] Idempotency 규칙 일치:
+- docs/quickstart.md: 45-day retention
+- SSoT meter.idempotency_retention_days: 45
+
+[PASS] Problem Types (RFC 9457):
+- docs/problem-types.md: 6가지 타입 정의
+- 실제 코드 (pricing/problem_details.py) 일치
+
+## 6. AI/Agent 통합 관점 검증
+[PASS] llms.txt 구조:
+- 제목 명확 ("Decisionproof API")
+- 8개 primary links (명확한 경로)
+- 블록쿼트로 요약 제공
+
+[PASS] llms-full.txt Agent Hints:
+- Auth Header 형식 명시
+- Idempotency 규칙 1줄 요약
+- Billability 규칙 1줄 요약
+- 429 처리 방법 명시
+- RateLimit 헤더 파싱 방법 명시
+
+[GOOD] 문서 간 Cross-reference:
+- quickstart → auth, rate-limits, metering-billing
+- problem-types → metering-billing
+- pricing-ssot → /pricing/ssot.json (canonical)
+
+## 7. 테스트 커버리지
+[PASS] 15/15 doc endpoint tests
+- OpenAPI 3.1.0 검증 (4 tests)
+- llms.txt 링크 무결성 (3 tests)
+- Pricing SSoT 검증 (4 tests)
+- 429 ProblemDetails regression (1 test)
+- Documentation endpoints (3 tests)
+
+## 8. 발견된 이슈
+[NONE] 치명적 이슈 없음
+
+## 9. 개선 권장사항 (선택)
+[OPTIONAL] Base URL 환경변수화:
+- 현재: 문서에 "https://api.decisionproof.ai" 하드코딩
+- 권장: 배포 시 환경변수로 동적 생성 고려
+
+[OPTIONAL] OpenAPI 예제 추가:
+- 현재: 자동 생성 스키마 (examples 없음)
+- 권장: request/response 예제 추가 (차후 작업)
+
+## 10. 최종 판정
+✅ APPROVED
+
+MTS-3.0-DOC 패치는 Spec Lock v0.1을 준수하며,
+AI/Agent 통합에 필요한 모든 요구사항을 충족합니다.
+
+- Runtime Endpoints: 정상 작동
+- Documentation: 정확하고 일관성 있음
+- Security: 실제 키/PII 노출 없음
+- Tests: 100% 통과
+- Contract: RFC 9457, IETF RateLimit 헤더 유지
+
+## 서명
+검수자: Claude Sonnet 4.5
+일시: 2026-02-14 11:01 UTC
