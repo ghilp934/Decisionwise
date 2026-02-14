@@ -147,13 +147,18 @@ async def plan_violation_handler(request: Request, exc: PlanViolationError) -> J
 
     Returns application/problem+json with plan-specific error details.
     P1-2: Includes Retry-After header for 429 responses using exc.retry_after field.
+    RC-2: Uses opaque instance identifier (urn:decisionproof:trace:{request_id}).
     """
+    # RC-2: Opaque instance using request_id from context
+    request_id = request_id_var.get()
+    instance = f"urn:decisionproof:trace:{request_id}" if request_id else f"urn:decisionproof:trace:{uuid.uuid4()}"
+
     problem = ProblemDetail(
         type=exc.error_type,
         title=exc.title,
         status=exc.status_code,
         detail=exc.detail,
-        instance=request.url.path,
+        instance=instance,
     )
 
     headers = {}
@@ -178,16 +183,21 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 
     P0-1: Preserves dict detail fields for structured error responses (RFC 9457 compliant).
     P0 Hotfix: Adds Retry-After header for 429 responses.
+    RC-2: Uses opaque instance identifier and proper domain.
     """
     # P0-1: Don't force-cast detail to str - preserve dict if provided
     detail_value = exc.detail if exc.detail is not None else _get_title_for_status(exc.status_code)
 
+    # RC-2: Opaque instance using request_id from context
+    request_id = request_id_var.get()
+    instance = f"urn:decisionproof:trace:{request_id}" if request_id else f"urn:decisionproof:trace:{uuid.uuid4()}"
+
     problem = ProblemDetail(
-        type=f"https://dpp.example.com/problems/http-{exc.status_code}",
+        type=f"https://api.decisionproof.ai/problems/http-{exc.status_code}",
         title=_get_title_for_status(exc.status_code),
         status=exc.status_code,
         detail=detail_value,
-        instance=request.url.path,
+        instance=instance,
     )
 
     headers = {}
@@ -207,23 +217,28 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Handle request validation errors with RFC 9457 Problem Details format.
 
-    Returns 400 Bad Request with application/problem+json.
+    Returns 422 Unprocessable Entity with application/problem+json.
+    RC-2: Uses opaque instance identifier and proper domain.
     """
     # Extract first error for detail message
     first_error = exc.errors()[0] if exc.errors() else {}
     field = ".".join(str(loc) for loc in first_error.get("loc", []))
     msg = first_error.get("msg", "Validation error")
 
+    # RC-2: Opaque instance using request_id from context
+    request_id = request_id_var.get()
+    instance = f"urn:decisionproof:trace:{request_id}" if request_id else f"urn:decisionproof:trace:{uuid.uuid4()}"
+
     problem = ProblemDetail(
-        type="https://dpp.example.com/problems/validation-error",
+        type="https://api.decisionproof.ai/problems/validation-error",
         title="Request Validation Failed",
-        status=status.HTTP_400_BAD_REQUEST,
+        status=422,
         detail=f"Invalid field '{field}': {msg}",
-        instance=request.url.path,
+        instance=instance,
     )
 
     return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
+        status_code=422,
         content=problem.model_dump(exclude_none=True),
         media_type="application/problem+json",
     )
@@ -234,13 +249,18 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
     """Handle uncaught exceptions with RFC 9457 Problem Details format.
 
     Returns 500 Internal Server Error with application/problem+json.
+    RC-2: Uses opaque instance identifier and proper domain.
     """
+    # RC-2: Opaque instance using request_id from context
+    request_id = request_id_var.get()
+    instance = f"urn:decisionproof:trace:{request_id}" if request_id else f"urn:decisionproof:trace:{uuid.uuid4()}"
+
     problem = ProblemDetail(
-        type="https://dpp.example.com/problems/internal-error",
+        type="https://api.decisionproof.ai/problems/internal-error",
         title="Internal Server Error",
         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="An unexpected error occurred. Please try again later.",
-        instance=request.url.path,
+        instance=instance,
     )
 
     # Log the actual exception for debugging (TODO: add structured logging)

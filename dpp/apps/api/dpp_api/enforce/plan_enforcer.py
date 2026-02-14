@@ -74,7 +74,7 @@ class PlanEnforcer:
         if not plan:
             raise PlanViolationError(
                 status_code=400,
-                error_type="https://api.dpp.example/problems/no-active-plan",
+                error_type="https://api.decisionproof.ai/problems/no-active-plan",
                 title="No Active Plan",
                 detail=f"Tenant {tenant_id} has no active plan assigned",
             )
@@ -97,7 +97,7 @@ class PlanEnforcer:
         if pack_type not in allowed_pack_types:
             raise PlanViolationError(
                 status_code=400,
-                error_type="https://api.dpp.example/problems/pack-type-not-allowed",
+                error_type="https://api.decisionproof.ai/problems/pack-type-not-allowed",
                 title="Pack Type Not Allowed",
                 detail=f"Pack type '{pack_type}' is not allowed in plan '{plan.plan_id}'. "
                 f"Allowed types: {allowed_pack_types}",
@@ -126,7 +126,7 @@ class PlanEnforcer:
         if requested_max_cost_usd_micros < MINIMUM_MAX_COST_USD_MICROS:
             raise PlanViolationError(
                 status_code=400,
-                error_type="https://api.dpp.example/problems/max-cost-too-low",
+                error_type="https://api.decisionproof.ai/problems/max-cost-too-low",
                 title="Maximum Cost Too Low",
                 detail=f"Requested max_cost ({requested_max_cost_usd_micros} micros) "
                 f"is below minimum ({MINIMUM_MAX_COST_USD_MICROS} micros). "
@@ -142,7 +142,7 @@ class PlanEnforcer:
         if max_cost_limit is not None and requested_max_cost_usd_micros > max_cost_limit:
             raise PlanViolationError(
                 status_code=402,
-                error_type="https://api.dpp.example/problems/max-cost-exceeded",
+                error_type="https://api.decisionproof.ai/problems/max-cost-exceeded",
                 title="Maximum Cost Exceeded",
                 detail=f"Requested max_cost ({requested_max_cost_usd_micros} micros) "
                 f"exceeds plan limit ({max_cost_limit} micros) for pack_type '{pack_type}'",
@@ -186,7 +186,7 @@ class PlanEnforcer:
             # P1-2: Include retry_after field for 429 errors
             raise PlanViolationError(
                 status_code=429,
-                error_type="https://api.dpp.example/problems/rate-limit-exceeded",
+                error_type="https://api.decisionproof.ai/problems/rate-limit-exceeded",
                 title="Rate Limit Exceeded",
                 detail=f"Rate limit of {rate_limit_post_per_min} POST /runs per minute exceeded. "
                 f"Retry after {ttl} seconds.",
@@ -231,7 +231,7 @@ class PlanEnforcer:
             # P1-2: Include retry_after field for 429 errors
             raise PlanViolationError(
                 status_code=429,
-                error_type="https://api.dpp.example/problems/rate-limit-exceeded",
+                error_type="https://api.decisionproof.ai/problems/rate-limit-exceeded",
                 title="Rate Limit Exceeded",
                 detail=f"Rate limit of {rate_limit_poll_per_min} GET /runs polling per minute exceeded. "
                 f"Retry after {ttl} seconds.",

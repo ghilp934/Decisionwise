@@ -59,7 +59,7 @@ async def get_tenant_usage(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ProblemDetail(
-                type="https://api.dpp.example/problems/invalid-date-format",
+                type="https://api.decisionproof.ai/problems/invalid-date-format",
                 title="Invalid Date Format",
                 status=400,
                 detail=f"Date must be in YYYY-MM-DD format: {e}",
@@ -72,7 +72,7 @@ async def get_tenant_usage(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ProblemDetail(
-                type="https://api.dpp.example/problems/invalid-date-range",
+                type="https://api.decisionproof.ai/problems/invalid-date-range",
                 title="Invalid Date Range",
                 status=400,
                 detail=f"from_date ({from_date}) must be <= to_date ({to_date})",
