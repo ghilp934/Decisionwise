@@ -76,6 +76,13 @@ class TierLimitsModel(BaseModel):
     max_input_tokens: int
     max_output_tokens: int
 
+    # P0-6: dict-like access for test compatibility
+    def __getitem__(self, key: str):
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value):
+        return setattr(self, key, value)
+
 
 class TierPoliciesModel(BaseModel):
     """Tier policy names"""
@@ -83,11 +90,25 @@ class TierPoliciesModel(BaseModel):
     monthly_dc_policy_name: str
     hard_overage_cap_policy_name: str
 
+    # P0-6: dict-like access for test compatibility
+    def __getitem__(self, key: str):
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value):
+        return setattr(self, key, value)
+
 
 class TierSafetyModel(BaseModel):
     """Tier safety features"""
     overage_alerts: bool
     hard_spending_limit: bool
+
+    # P0-6: dict-like access for test compatibility
+    def __getitem__(self, key: str):
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value):
+        return setattr(self, key, value)
 
 
 class TierModel(BaseModel):
@@ -132,8 +153,19 @@ class PricingSSoTModel(BaseModel):
                 return tier
         return None
 
-    def is_zero_unlimited(self, value: int, field_name: str) -> bool:
-        """Check if zero means unlimited for given field"""
-        if value != 0:
+    def is_zero_unlimited(self, a, b) -> bool:
+        """
+        Check if zero means unlimited for given field
+
+        P0-6: Accepts either (field_name: str, value: int) or (value: int, field_name: str)
+        for compatibility with different call patterns
+        """
+        # Detect argument order
+        if isinstance(a, str):
+            field_name, value = a, b
+        else:
+            value, field_name = a, b
+
+        if int(value) != 0:
             return False
         return field_name in self.unlimited_semantics.applies_to_fields

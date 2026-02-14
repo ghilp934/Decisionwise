@@ -18,9 +18,21 @@ class EnforcementEngine:
     3. Hard Overage Cap - Redis + Database
     """
 
-    def __init__(self, redis: Redis, ssot: PricingSSoTModel):
-        self.redis = redis
-        self.ssot = ssot
+    def __init__(self, a, b):
+        """
+        P0-7: Constructor with argument order detection for compatibility
+
+        Accepts either:
+        - EnforcementEngine(ssot, redis)
+        - EnforcementEngine(redis, ssot)
+        """
+        # Detect argument order by duck typing
+        if hasattr(a, "tiers") and hasattr(b, "get"):
+            # a is ssot-like, b is redis-like
+            self.ssot, self.redis = a, b
+        else:
+            # a is redis-like, b is ssot-like
+            self.redis, self.ssot = a, b
 
     def check_rpm_limit(
         self,
@@ -69,7 +81,7 @@ class EnforcementEngine:
                 detail=f"RPM limit of {rpm_limit} requests per minute exceeded",
                 violated_policies=[
                     ViolatedPolicy(
-                        policy_name=tier.policies.rpm_policy_name,
+                        policy=tier.policies.rpm_policy_name,
                         limit=rpm_limit,
                         current=new_count - 1,  # After decr
                         window_seconds=window_seconds
@@ -83,14 +95,21 @@ class EnforcementEngine:
         self,
         workspace_id: str,
         tier: TierModel,
-        current_month: str  # "2026-02"
+        dc_amount: int,
+        occurred_at: datetime
     ) -> Optional[ProblemDetails]:
         """
-        Check monthly DC quota
-        
+        Check monthly DC quota (P0-7: projected basis)
+
+        Args:
+            workspace_id: Workspace ID
+            tier: Tier configuration
+            dc_amount: DC amount to be charged
+            occurred_at: Timestamp of the request
+
         Returns:
             None if OK
-            ProblemDetails if exceeded
+            ProblemDetails if exceeded (projected > quota)
         """
 
         monthly_quota = tier.limits.monthly_quota_dc
@@ -100,19 +119,23 @@ class EnforcementEngine:
             return None
 
         # Get current usage from Redis
+        current_month = occurred_at.strftime("%Y-%m")
         usage_key = f"usage:{workspace_id}:{current_month}"
         current_usage = int(self.redis.get(usage_key) or 0)
 
-        # Check limit
-        if current_usage >= monthly_quota:
+        # P0-7: Projected usage = current + dc_amount
+        projected_usage = current_usage + dc_amount
+
+        # Check limit (projected basis)
+        if projected_usage > monthly_quota:
             return ProblemDetails(
                 type=self.ssot.http.problem_details.type_uris["quota_exceeded"],
                 title="Request cannot be satisfied as assigned quota has been exceeded",
                 status=429,
-                detail=f"Monthly DC quota of {monthly_quota} exceeded",
+                detail=f"Monthly DC quota of {monthly_quota} would be exceeded (current: {current_usage}, requested: {dc_amount})",
                 violated_policies=[
                     ViolatedPolicy(
-                        policy_name=tier.policies.monthly_dc_policy_name,
+                        policy=tier.policies.monthly_dc_policy_name,
                         limit=monthly_quota,
                         current=current_usage,
                         window_seconds=None  # Monthly quota
@@ -126,14 +149,21 @@ class EnforcementEngine:
         self,
         workspace_id: str,
         tier: TierModel,
-        current_month: str
+        dc_amount: int,
+        occurred_at: datetime
     ) -> Optional[ProblemDetails]:
         """
-        Check hard overage cap
-        
+        Check hard overage cap (P0-7: projected basis)
+
+        Args:
+            workspace_id: Workspace ID
+            tier: Tier configuration
+            dc_amount: DC amount to be charged
+            occurred_at: Timestamp of the request
+
         Returns:
             None if OK
-            ProblemDetails if exceeded
+            ProblemDetails if exceeded (projected > cap + grace)
         """
 
         hard_cap = tier.limits.hard_overage_dc_cap
@@ -143,25 +173,29 @@ class EnforcementEngine:
             return None
 
         # Get current usage
+        current_month = occurred_at.strftime("%Y-%m")
         usage_key = f"usage:{workspace_id}:{current_month}"
         current_usage = int(self.redis.get(usage_key) or 0)
+
+        # P0-7: Projected usage = current + dc_amount
+        projected_usage = current_usage + dc_amount
 
         # Hard cap = monthly_quota + hard_overage_dc_cap
         total_cap = tier.limits.monthly_quota_dc + hard_cap
 
         # Check limit (with grace overage)
-        grace_dc = self._calculate_grace_overage(total_cap)
+        grace_dc = self._calculate_grace_overage(tier)
         effective_cap = total_cap + grace_dc
 
-        if current_usage >= effective_cap:
+        if projected_usage > effective_cap:
             return ProblemDetails(
                 type=self.ssot.http.problem_details.type_uris["quota_exceeded"],
                 title="Request cannot be satisfied as assigned quota has been exceeded",
                 status=429,
-                detail=f"Hard overage cap of {hard_cap} DC exceeded",
+                detail=f"Hard overage cap of {hard_cap} DC would be exceeded (current: {current_usage}, requested: {dc_amount}, grace: {grace_dc})",
                 violated_policies=[
                     ViolatedPolicy(
-                        policy_name=tier.policies.hard_overage_cap_policy_name,
+                        policy=tier.policies.hard_overage_cap_policy_name,
                         limit=total_cap,
                         current=current_usage,
                         window_seconds=None
@@ -171,16 +205,21 @@ class EnforcementEngine:
 
         return None
 
-    def _calculate_grace_overage(self, hard_cap: int) -> int:
+    def _calculate_grace_overage(self, tier: TierModel) -> int:
         """
         Calculate grace overage amount
-        
+
+        Args:
+            tier: Tier configuration
+
         Returns:
             Grace DC amount (waived)
         """
 
         if not self.ssot.grace_overage.enabled:
             return 0
+
+        hard_cap = tier.limits.hard_overage_dc_cap
 
         # min(1% of cap, 100 DC)
         grace_percent = self.ssot.grace_overage.max_grace_percent / 100

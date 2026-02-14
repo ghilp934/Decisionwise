@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy only requirements first (layer caching)
-COPY pyproject.toml setup.py ./
+COPY pyproject.toml ./
 RUN pip install --no-cache-dir -e .
 
 # Copy application code

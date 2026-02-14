@@ -39,9 +39,10 @@ class MeteringService:
     Retention: 45 days
     """
 
-    def __init__(self, redis: Redis, ssot: PricingSSoTModel):
-        self.redis = redis
+    def __init__(self, ssot: PricingSSoTModel, redis: Redis):
+        """Constructor with ssot-first argument order"""
         self.ssot = ssot
+        self.redis = redis
 
     def record_usage(
         self,
@@ -49,33 +50,39 @@ class MeteringService:
         run_id: str,
         dc_amount: int,
         http_status: int,
-        current_month: str,
+        occurred_at: datetime,
         tier_monthly_quota: int = 0
     ) -> MeteringResult:
         """
-        Record usage with idempotency
-        
+        Record usage with idempotency (P0-4: Atomic SET NX EX)
+
         Args:
             workspace_id: Workspace ID
             run_id: Run ID (idempotency key)
             dc_amount: DC amount consumed
             http_status: HTTP response status
-            current_month: "2026-02"
+            occurred_at: Timestamp of the request (UTC)
             tier_monthly_quota: Workspace tier monthly quota
-        
+
         Returns:
             MeteringResult with deduplication status
         """
 
+        # Derive current_month from occurred_at (UTC)
+        current_month = occurred_at.strftime("%Y-%m")
+
         # 1. Check billability
         billable = self._is_billable(http_status)
 
-        # 2. Idempotency check
+        # 2. Atomic idempotency check (P0-4: SET NX EX pattern, TOCTOU-safe)
         idempotency_key = self._generate_idempotency_key(workspace_id, run_id)
-        is_duplicate = self.redis.exists(idempotency_key)
+        retention_seconds = self.ssot.meter.idempotency_retention_days * 86400
 
-        if is_duplicate:
-            # Duplicate - do NOT charge
+        # SET NX EX: atomic "set if not exists" with expiration
+        was_set = self.redis.set(idempotency_key, "1", nx=True, ex=retention_seconds)
+
+        if not was_set:
+            # Duplicate - key already exists, do NOT charge
             return MeteringResult(
                 event_id=run_id,
                 deduplication_status="duplicate",
@@ -84,10 +91,6 @@ class MeteringService:
                     workspace_id, current_month, tier_monthly_quota
                 )
             )
-
-        # 3. Record idempotency key (45 days TTL)
-        retention_seconds = self.ssot.meter.idempotency_retention_days * 86400
-        self.redis.setex(idempotency_key, retention_seconds, "1")
 
         # 4. Charge DC (if billable)
         dc_charged = 0

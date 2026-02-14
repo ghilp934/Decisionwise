@@ -76,3 +76,17 @@ def load_pricing_ssot() -> PricingSSoTModel:
     """Convenience function to load pricing SSoT"""
     loader = get_ssot_loader()
     return loader.load()
+
+
+def validate_ssot_against_schema(ssot_json: dict, schema: dict) -> None:
+    """
+    Validate SSoT JSON against JSON Schema
+
+    Args:
+        ssot_json: SSoT JSON dictionary
+        schema: JSON Schema dictionary
+
+    Raises:
+        JsonSchemaValidationError: If validation fails
+    """
+    validate(instance=ssot_json, schema=schema)

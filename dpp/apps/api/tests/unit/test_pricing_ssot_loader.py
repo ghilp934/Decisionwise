@@ -71,12 +71,12 @@ class TestJSONSchemaValidation:
         """Fixture pricing_ssot.json must validate against pricing_ssot_schema.json."""
         # Load SSoT JSON
         ssot_fixture_path = Path(__file__).parent.parent.parent / "dpp_api" / "pricing" / "fixtures" / "pricing_ssot.json"
-        with open(ssot_fixture_path) as f:
+        with open(ssot_fixture_path, encoding='utf-8') as f:
             ssot_json = json.load(f)
 
         # Load Schema
         schema_path = Path(__file__).parent.parent.parent / "dpp_api" / "pricing" / "fixtures" / "pricing_ssot_schema.json"
-        with open(schema_path) as f:
+        with open(schema_path, encoding='utf-8') as f:
             schema = json.load(f)
 
         # Validate (should not raise)
