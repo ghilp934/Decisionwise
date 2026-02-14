@@ -1,7 +1,7 @@
 # RC-5 Sensitive Data Scan Report
 
-**Generated At:** 2026-02-14T22:27:44.101037+00:00  
-**Commit:** `e482c909`  
+**Generated At:** 2026-02-14T22:32:53.633668+00:00  
+**Commit:** `d7681d29`  
 
 ---
 
@@ -28,14 +28,14 @@
   - Image ID: `sha256:811ae9727c72e486e59b8e9633adccc05c30a0ff483ba4a024699167e745e06d`  
   - Tar Entries: 24  
 - **decisionproof-api:rc5-trap**  
-  - Image ID: `sha256:a3dd585215e9d69808a06c91895c788b5da64c860cf61e3074d9dfa9876e509d`  
+  - Image ID: `sha256:4062eb06165eb6b6ce5660f8dace0439b6e89cd1db5860ffbb175c83b64239ab`  
   - Tar Entries: 24  
 
 ### Timing
-- **Repo Scan Duration:** 0.11s  
-- **Docker Build Duration:** 0.38s  
-- **Docker Scan Duration:** 24.59s  
-- **Total Duration:** 25.16s  
+- **Repo Scan Duration:** 0.09s  
+- **Docker Build Duration:** 0.33s  
+- **Docker Scan Duration:** 22.05s  
+- **Total Duration:** 22.55s  
 
 ## Summary
 

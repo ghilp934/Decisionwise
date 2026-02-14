@@ -1,7 +1,7 @@
 # RC-5 Release Hygiene Report
 
-**Generated At:** 2026-02-14T22:27:16.965607+00:00  
-**Commit:** `e482c909`  
+**Generated At:** 2026-02-14T22:32:29.490238+00:00  
+**Commit:** `d7681d29`  
 
 ---
 
@@ -30,9 +30,9 @@
 
 ### Timing
 - **Repo Scan Duration:** 0.03s  
-- **Docker Build Duration:** 0.26s  
-- **Docker Scan Duration:** 16.28s  
-- **Total Duration:** 16.65s  
+- **Docker Build Duration:** 0.22s  
+- **Docker Scan Duration:** 14.17s  
+- **Total Duration:** 14.49s  
 
 ## Summary
 
