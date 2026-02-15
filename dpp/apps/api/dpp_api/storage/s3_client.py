@@ -1,6 +1,7 @@
 """S3 Storage Client for DPP.
 
 P1-1: Presigned URL generation for completed run results.
+Ops Hardening v2: Remove silent bucket defaults, fail-fast on misconfig.
 """
 
 import logging
@@ -11,6 +12,8 @@ from typing import Optional
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+
+from dpp_api.config.env import get_s3_result_bucket
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +29,22 @@ class S3Client:
     ):
         """Initialize S3 client.
 
+        Ops Hardening v2: NO silent defaults for bucket - fail-fast on misconfig.
+
         Args:
             bucket: S3 bucket name (default from env: S3_RESULT_BUCKET or DPP_RESULTS_BUCKET)
             region: AWS region (default from env: AWS_REGION or us-east-1)
             endpoint_url: Custom endpoint URL (for LocalStack/MinIO testing)
+
+        Raises:
+            ValueError: If bucket cannot be resolved from args or env
         """
-        # P0-B: Canonical env var with backward compatibility
-        self.bucket = bucket or os.getenv("S3_RESULT_BUCKET") or os.getenv("DPP_RESULTS_BUCKET", "dpp-results")
+        # Ops Hardening v2: Fail-fast if bucket missing (no silent "dpp-results" default)
+        if bucket:
+            self.bucket = bucket
+        else:
+            self.bucket = get_s3_result_bucket()  # Raises ValueError if missing
+
         self.region = region or os.getenv("AWS_REGION", "us-east-1")
         self.endpoint_url = endpoint_url or os.getenv("S3_ENDPOINT_URL")
 

@@ -1,4 +1,7 @@
-"""Health check endpoints."""
+"""Health check endpoints.
+
+Ops Hardening v2: Use centralized env helpers.
+"""
 
 import logging
 import os
@@ -8,6 +11,7 @@ from fastapi import APIRouter, Response, status
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from dpp_api.config.env import get_s3_result_bucket, is_localstack_endpoint
 from dpp_api.db.redis_client import RedisClient
 from dpp_api.db.session import engine
 
@@ -59,7 +63,7 @@ def check_redis() -> str:
 def check_sqs() -> str:
     """Check SQS connectivity.
 
-    P0-2: Reuse get_sqs_client() instead of hardcoding test credentials.
+    Ops Hardening v2: Reuse get_sqs_client() (now with fail-fast queue URL validation).
 
     Returns:
         str: "up" if healthy, error message otherwise
@@ -71,6 +75,10 @@ def check_sqs() -> str:
         # Simple list_queues to verify connectivity
         sqs_client.client.list_queues()
         return "up"
+    except ValueError as e:
+        # Config error (missing env var)
+        logger.error(f"SQS config error: {e}")
+        return f"down: config error - {str(e)[:40]}"
     except Exception as e:
         logger.error(f"SQS health check failed: {e}")
         return f"down: {str(e)[:50]}"
@@ -79,17 +87,14 @@ def check_sqs() -> str:
 def check_s3() -> str:
     """Check S3 connectivity.
 
-    P0-2 + P1-1: Bucket-scoped check (no ListAllMyBuckets).
-    Uses head_bucket on DPP_RESULTS_BUCKET instead.
+    Ops Hardening v2: Use centralized bucket resolver (fail-fast if missing).
 
     Returns:
         str: "up" if healthy, error message otherwise
     """
     try:
-        # P0-B: Canonical env var with backward compatibility
-        results_bucket = os.getenv("S3_RESULT_BUCKET") or os.getenv("DPP_RESULTS_BUCKET")
-        if not results_bucket:
-            return "down: S3_RESULT_BUCKET (or DPP_RESULTS_BUCKET) not configured"
+        # Ops Hardening v2: Use centralized resolver (raises ValueError if missing)
+        results_bucket = get_s3_result_bucket()
 
         # P0-2: Conditional endpoint_url and credentials
         s3_endpoint = os.getenv("S3_ENDPOINT_URL")
@@ -97,13 +102,8 @@ def check_s3() -> str:
 
         if s3_endpoint:
             s3_kwargs["endpoint_url"] = s3_endpoint
-            # P0-A: Enhanced LocalStack detection
-            endpoint_lower = s3_endpoint.lower()
-            is_localstack = any(
-                marker in endpoint_lower
-                for marker in ["localhost", "127.0.0.1", "localstack", "host.docker.internal"]
-            )
-            if is_localstack and not os.getenv("AWS_ACCESS_KEY_ID"):
+            # Ops Hardening v2: Enhanced LocalStack detection (4 markers)
+            if is_localstack_endpoint(s3_endpoint) and not os.getenv("AWS_ACCESS_KEY_ID"):
                 s3_kwargs["aws_access_key_id"] = "test"
                 s3_kwargs["aws_secret_access_key"] = "test"
 
@@ -118,6 +118,10 @@ def check_s3() -> str:
         # P1-1: head_bucket instead of list_buckets
         s3_client.head_bucket(Bucket=results_bucket)
         return "up"
+    except ValueError as e:
+        # Config error (missing env var)
+        logger.error(f"S3 config error: {e}")
+        return f"down: config error - {str(e)[:40]}"
     except Exception as e:
         logger.error(f"S3 health check failed: {e}")
         return f"down: {str(e)[:50]}"
