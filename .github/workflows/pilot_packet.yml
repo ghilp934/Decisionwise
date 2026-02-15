@@ -12,12 +12,16 @@ on:
     branches:
       - main
       - master
-    paths:
-      - 'dpp/docs/pilot/**'
-      - 'dpp/tools/build_pilot_kickoff_packet.sh'
-      - 'dpp/tools/rehearse_customer_packet.sh'
-      - 'dpp/tools/scan_internal_content.sh'
   workflow_dispatch:
+    inputs:
+      packet_mode:
+        description: 'Packet mode (customer or internal)'
+        required: false
+        type: choice
+        options:
+          - customer
+          - internal
+        default: customer
 
 # Minimal permissions (write for PR comments)
 permissions:
@@ -27,11 +31,25 @@ permissions:
 
 jobs:
   rehearse-customer:
+    name: rehearse-customer
     runs-on: ubuntu-latest
+    env:
+      PACKET_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.packet_mode || 'customer' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Preflight - Record CI Metadata
+        run: |
+          mkdir -p dpp/evidence/pilot_packet_review/ci_meta
+          cat > dpp/evidence/pilot_packet_review/ci_meta/ci_meta.txt <<EOF
+          event: ${{ github.event_name }}
+          sha: ${{ github.sha }}
+          ref: ${{ github.ref }}
+          packet_mode: ${{ env.PACKET_MODE }}
+          run_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -45,6 +63,8 @@ jobs:
 
       - name: Run Customer Rehearsal
         id: rehearsal
+        env:
+          PACKET_MODE: ${{ env.PACKET_MODE }}
         run: |
           set +e
           bash dpp/tools/rehearse_customer_packet.sh > rehearsal_output.log 2>&1
@@ -98,7 +118,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pilot-packet-customer
+          name: pilot-packet-customer-${{ github.sha }}
           path: |
             dpp/dist/pilot_kickoff_packet_customer_*.zip
             dpp/evidence/pilot_packet_review/**
@@ -201,7 +221,7 @@ jobs:
       - name: Upload Internal Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: pilot-packet-internal
+          name: pilot-packet-internal-${{ github.sha }}
           path: |
             dpp/dist/pilot_kickoff_packet_internal_*.zip
           retention-days: 30
