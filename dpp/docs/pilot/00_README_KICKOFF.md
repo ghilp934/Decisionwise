@@ -173,6 +173,28 @@ Bearer 토큰을 사용하여 `/v1/runs` 엔드포인트로 첫 실행을 생성
 
 ---
 
+## 15분 리허설 체크리스트
+
+파일럿 시작 전 **15분 안에** 전체 패킷을 빠르게 훑어보고 핵심 작업을 점검하세요.
+
+### 체크리스트
+
+- [ ] **1분**: ZIP 압축 해제 및 폴더 구조 확인 (`pilot/`, `manifest.txt`)
+- [ ] **1분**: `manifest.txt` 확인 (Packet Mode: customer, 파일 10개)
+- [ ] **3분**: `00_README_KICKOFF.md` 읽기 (파일럿 범위, 성공 기준, 지원 채널)
+- [ ] **3분**: `01_ONBOARDING_CHECKLIST.md` 따라하기 (계정 설정, 네트워크, Health Check)
+- [ ] **4분**: `02_QUICKSTART_FOR_PILOT.md` API 호출 (BASE_URL, TOKEN 설정 → `/health`, `/readyz` 호출)
+- [ ] **1분**: `03_SUPPORT_AND_ESCALATION.md` 확인 (지원 이메일, S0/S1/S2/S3 심각도)
+- [ ] **1분**: `04_BILLING_AND_REFUND.md` 요금제 확인 (STARTER: ₩29,000/월, 1,000 DC)
+- [ ] **30초**: 보안 및 정책 문서 스캔 (`05`, `06`, `07`)
+- [ ] **30초**: 종료 및 데이터 보관 확인 (`08`)
+- [ ] **30초**: 변경 로그 및 연락처 확인 (`09`)
+
+**소요 시간**: 약 15분
+**완료 기준**: 10개 항목 모두 체크 완료
+
+---
+
 **다음 단계:**
 
 1. ✅ `01_ONBOARDING_CHECKLIST.md` 읽고 체크리스트 완료

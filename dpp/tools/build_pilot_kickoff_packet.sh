@@ -4,26 +4,43 @@ set -Eeuo pipefail
 # ==============================================================================
 # Paid Pilot Kickoff Packet Builder
 # ==============================================================================
-# 목적: docs/pilot/*.md + references/ → dist/pilot_kickoff_packet_YYYYMMDD.zip
-# 산출물: dist/pilot_kickoff_packet_YYYYMMDD.zip
-# 실행: ./tools/build_pilot_kickoff_packet.sh
+# 목적: docs/pilot/*.md + references/ → dist/pilot_kickoff_packet_{MODE}_YYYYMMDD.zip
+# 산출물: dist/pilot_kickoff_packet_customer_YYYYMMDD.zip (기본)
+#         dist/pilot_kickoff_packet_internal_YYYYMMDD.zip (PACKET_MODE=internal)
+# 실행: PACKET_MODE=customer ./tools/build_pilot_kickoff_packet.sh (기본)
+#       PACKET_MODE=internal ./tools/build_pilot_kickoff_packet.sh
 # ==============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
+# PACKET_MODE 설정 (customer | internal)
+PACKET_MODE="${PACKET_MODE:-customer}"
+
+if [[ "$PACKET_MODE" != "customer" && "$PACKET_MODE" != "internal" ]]; then
+  echo "ERROR: PACKET_MODE must be 'customer' or 'internal' (got: $PACKET_MODE)"
+  exit 1
+fi
+
 DATE_STAMP=$(date +%Y%m%d)
 DIST_DIR="dist"
-BUILD_DIR="$DIST_DIR/pilot_kickoff_build"
-ZIP_NAME="pilot_kickoff_packet_${DATE_STAMP}.zip"
+BUILD_DIR="$DIST_DIR/pilot_kickoff_build_${PACKET_MODE}"
+ZIP_NAME="pilot_kickoff_packet_${PACKET_MODE}_${DATE_STAMP}.zip"
 ZIP_PATH="$DIST_DIR/$ZIP_NAME"
+
+INCLUDE_REFERENCES="false"
+if [[ "$PACKET_MODE" == "internal" ]]; then
+  INCLUDE_REFERENCES="true"
+fi
 
 echo "=========================================="
 echo "Paid Pilot Kickoff Packet Builder"
 echo "=========================================="
 echo "날짜: $(date)"
 echo "Git SHA: $(git rev-parse --short HEAD)"
+echo "Packet Mode: $PACKET_MODE"
+echo "Include References: $INCLUDE_REFERENCES"
 echo ""
 
 # ------------------------------------------------------------------------------
@@ -65,7 +82,10 @@ echo "[2/5] 빌드 디렉토리 초기화..."
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR/pilot"
-mkdir -p "$BUILD_DIR/references"
+
+if [[ "$INCLUDE_REFERENCES" == "true" ]]; then
+  mkdir -p "$BUILD_DIR/references"
+fi
 
 echo "✅ $BUILD_DIR 준비 완료"
 
@@ -80,18 +100,22 @@ for f in "${PILOT_FILES[@]}"; do
 done
 echo "  ✅ 10개 Pilot 문서 복사 완료"
 
-# References 복사
-cp "docs/RC_MASTER_CHECKLIST.md" "$BUILD_DIR/references/"
-echo "  ✅ RC_MASTER_CHECKLIST.md 복사 완료"
+# References 복사 (internal 모드일 때만)
+if [[ "$INCLUDE_REFERENCES" == "true" ]]; then
+  cp "docs/RC_MASTER_CHECKLIST.md" "$BUILD_DIR/references/"
+  echo "  ✅ RC_MASTER_CHECKLIST.md 복사 완료"
 
-if [ -f "ops/runbooks/staging_dry_run.md" ]; then
-  cp "ops/runbooks/staging_dry_run.md" "$BUILD_DIR/references/"
-  echo "  ✅ staging_dry_run.md 복사 완료"
-fi
+  if [ -f "ops/runbooks/staging_dry_run.md" ]; then
+    cp "ops/runbooks/staging_dry_run.md" "$BUILD_DIR/references/"
+    echo "  ✅ staging_dry_run.md 복사 완료"
+  fi
 
-if [ -f "ops/runbooks/rollback_drill.md" ]; then
-  cp "ops/runbooks/rollback_drill.md" "$BUILD_DIR/references/"
-  echo "  ✅ rollback_drill.md 복사 완료"
+  if [ -f "ops/runbooks/rollback_drill.md" ]; then
+    cp "ops/runbooks/rollback_drill.md" "$BUILD_DIR/references/"
+    echo "  ✅ rollback_drill.md 복사 완료"
+  fi
+else
+  echo "  ℹ️  References 제외 (customer 모드)"
 fi
 
 # ------------------------------------------------------------------------------
@@ -111,6 +135,8 @@ Git Short SHA: $(git rev-parse --short HEAD)
 Git Branch: $(git rev-parse --abbrev-ref HEAD)
 API Version: v0.4.2.2
 Packet Version: 2026-02-15
+Packet Mode: $PACKET_MODE
+Include References: $INCLUDE_REFERENCES
 
 ================================================================================
 파일 목록
@@ -124,18 +150,20 @@ for f in "${PILOT_FILES[@]}"; do
   echo "  - pilot/$filename" >> "$MANIFEST_PATH"
 done
 
-cat >> "$MANIFEST_PATH" <<EOF
+if [[ "$INCLUDE_REFERENCES" == "true" ]]; then
+  cat >> "$MANIFEST_PATH" <<EOF
 
 [참조 문서]
   - references/RC_MASTER_CHECKLIST.md
 EOF
 
-if [ -f "ops/runbooks/staging_dry_run.md" ]; then
-  echo "  - references/staging_dry_run.md" >> "$MANIFEST_PATH"
-fi
+  if [ -f "ops/runbooks/staging_dry_run.md" ]; then
+    echo "  - references/staging_dry_run.md" >> "$MANIFEST_PATH"
+  fi
 
-if [ -f "ops/runbooks/rollback_drill.md" ]; then
-  echo "  - references/rollback_drill.md" >> "$MANIFEST_PATH"
+  if [ -f "ops/runbooks/rollback_drill.md" ]; then
+    echo "  - references/rollback_drill.md" >> "$MANIFEST_PATH"
+  fi
 fi
 
 cat >> "$MANIFEST_PATH" <<EOF
