@@ -251,7 +251,9 @@ async def test_gate_1_span_and_log_correlation_200(otel_app, otel_testkit: OtelT
     attrs = dict(server.attributes or {})
 
     # Stable HTTP span semantic conventions (method/status/url parts)
-    assert attrs.get("http.request.method") == "GET", f"Missing/invalid http.request.method. attrs={attrs}"
+    # Support both new (http.request.method) and legacy (http.method) attribute names
+    method = attrs.get("http.request.method") or attrs.get("http.method")
+    assert method == "GET", f"Missing/invalid http method. attrs={attrs}"
     assert int(attrs.get("http.response.status_code")) == 200, f"Missing/invalid http.response.status_code. attrs={attrs}"
     assert attrs.get("url.scheme") in {"http", "https"}, f"Missing/invalid url.scheme. attrs={attrs}"
 
@@ -291,7 +293,9 @@ async def test_gate_2_span_and_log_correlation_429_early_return(otel_app, otel_t
 
     server = server_spans[0]
     attrs = dict(server.attributes or {})
-    assert attrs.get("http.request.method") == "GET"
+    # Support both new (http.request.method) and legacy (http.method) attribute names
+    method = attrs.get("http.request.method") or attrs.get("http.method")
+    assert method == "GET", f"Missing/invalid http method. attrs={attrs}"
     assert int(attrs.get("http.response.status_code")) == 429
 
 
