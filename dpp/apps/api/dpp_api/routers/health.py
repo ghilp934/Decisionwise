@@ -97,8 +97,9 @@ def check_s3() -> str:
 
         if s3_endpoint:
             s3_kwargs["endpoint_url"] = s3_endpoint
-            # Dummy credentials only for LocalStack
-            if not os.getenv("AWS_ACCESS_KEY_ID"):
+            # Dummy credentials ONLY for LocalStack (localhost/127.0.0.1)
+            is_localstack = "localhost" in s3_endpoint or "127.0.0.1" in s3_endpoint
+            if is_localstack and not os.getenv("AWS_ACCESS_KEY_ID"):
                 s3_kwargs["aws_access_key_id"] = "test"
                 s3_kwargs["aws_secret_access_key"] = "test"
 

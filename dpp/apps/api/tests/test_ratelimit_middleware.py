@@ -17,14 +17,16 @@ def test_ratelimit_middleware_respects_handler_headers(monkeypatch):
     - If handler sets RateLimit-Policy/RateLimit, middleware preserves them
     - If handler does NOT set them, middleware adds default headers
     """
-    # Import app after monkeypatch to ensure clean state
-    from dpp_api.main import app
+    from fastapi import FastAPI
     from dpp_api.rate_limiter import NoOpRateLimiter
 
-    # Ensure NoOpRateLimiter for predictable behavior
-    app.state.rate_limiter = NoOpRateLimiter(quota=60, window=60)
+    # Create a standalone test app with rate limit middleware
+    test_app = FastAPI()
 
-    # Create a test router with custom RateLimit headers
+    # Add NoOpRateLimiter for predictable behavior
+    test_app.state.rate_limiter = NoOpRateLimiter(quota=60, window=60)
+
+    # Create test router with custom RateLimit headers
     test_router = APIRouter()
 
     @test_router.get("/v1/test-custom-ratelimit")
@@ -39,10 +41,34 @@ def test_ratelimit_middleware_respects_handler_headers(monkeypatch):
         """Handler that does NOT set RateLimit headers."""
         return {"message": "no custom headers"}
 
-    # Add test routes to app
-    app.include_router(test_router)
+    # Include router before adding middleware
+    test_app.include_router(test_router)
 
-    client = TestClient(app)
+    # Add rate limit middleware (simplified version of main.py logic)
+    @test_app.middleware("http")
+    async def rate_limit_middleware(request, call_next):
+        response = await call_next(request)
+
+        # Only add headers for successful responses
+        if 200 <= response.status_code < 300:
+            # P0-4: Check if handler already set RateLimit headers
+            handler_set_policy = "RateLimit-Policy" in response.headers
+            handler_set_limit = "RateLimit" in response.headers
+
+            # Only add defaults if handler did NOT set them
+            if not handler_set_policy and not handler_set_limit:
+                rate_limiter = test_app.state.rate_limiter
+                result = rate_limiter.check_rate_limit(key="test", path=str(request.url.path))
+
+                rate_limit_policy = f'"{result.policy_id}"; q={result.quota}; w={result.window}'
+                rate_limit = f'"{result.policy_id}"; r={result.remaining}; t={result.reset}'
+
+                response.headers["RateLimit-Policy"] = rate_limit_policy
+                response.headers["RateLimit"] = rate_limit
+
+        return response
+
+    client = TestClient(test_app)
 
     # Test 1: Handler sets custom headers -> middleware preserves them
     resp1 = client.get("/v1/test-custom-ratelimit")

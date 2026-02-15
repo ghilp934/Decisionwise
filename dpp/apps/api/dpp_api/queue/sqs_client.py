@@ -43,8 +43,9 @@ class SQSClient:
         if sqs_endpoint:
             sqs_kwargs["endpoint_url"] = sqs_endpoint
 
-            # P0-2: Dummy credentials only for LocalStack
-            if not os.getenv("AWS_ACCESS_KEY_ID"):
+            # P0-2: Dummy credentials ONLY for LocalStack (localhost/127.0.0.1)
+            is_localstack = "localhost" in sqs_endpoint or "127.0.0.1" in sqs_endpoint
+            if is_localstack and not os.getenv("AWS_ACCESS_KEY_ID"):
                 sqs_kwargs["aws_access_key_id"] = "test"
                 sqs_kwargs["aws_secret_access_key"] = "test"
 
