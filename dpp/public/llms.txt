@@ -15,3 +15,5 @@
 - Pricing SSoT: /docs/pricing-ssot.md | /pricing/ssot.json
 - Human Escalation Templates: /docs/human-escalation-template.md
 - Changelog: /docs/changelog.md
+- Release Notes: /RELEASE_NOTES_v0.4_RC.md
+- Pilot Ready: /PILOT_READY.md
