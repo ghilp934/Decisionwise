@@ -27,11 +27,12 @@ class S3Client:
         """Initialize S3 client.
 
         Args:
-            bucket: S3 bucket name (default from env: DPP_RESULTS_BUCKET)
+            bucket: S3 bucket name (default from env: S3_RESULT_BUCKET or DPP_RESULTS_BUCKET)
             region: AWS region (default from env: AWS_REGION or us-east-1)
             endpoint_url: Custom endpoint URL (for LocalStack/MinIO testing)
         """
-        self.bucket = bucket or os.getenv("DPP_RESULTS_BUCKET", "dpp-results")
+        # P0-B: Canonical env var with backward compatibility
+        self.bucket = bucket or os.getenv("S3_RESULT_BUCKET") or os.getenv("DPP_RESULTS_BUCKET", "dpp-results")
         self.region = region or os.getenv("AWS_REGION", "us-east-1")
         self.endpoint_url = endpoint_url or os.getenv("S3_ENDPOINT_URL")
 

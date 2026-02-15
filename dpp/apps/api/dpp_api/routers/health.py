@@ -86,10 +86,10 @@ def check_s3() -> str:
         str: "up" if healthy, error message otherwise
     """
     try:
-        # P1-1: Use bucket-scoped check
-        results_bucket = os.getenv("DPP_RESULTS_BUCKET")
+        # P0-B: Canonical env var with backward compatibility
+        results_bucket = os.getenv("S3_RESULT_BUCKET") or os.getenv("DPP_RESULTS_BUCKET")
         if not results_bucket:
-            return "down: DPP_RESULTS_BUCKET not configured"
+            return "down: S3_RESULT_BUCKET (or DPP_RESULTS_BUCKET) not configured"
 
         # P0-2: Conditional endpoint_url and credentials
         s3_endpoint = os.getenv("S3_ENDPOINT_URL")
@@ -97,8 +97,12 @@ def check_s3() -> str:
 
         if s3_endpoint:
             s3_kwargs["endpoint_url"] = s3_endpoint
-            # Dummy credentials ONLY for LocalStack (localhost/127.0.0.1)
-            is_localstack = "localhost" in s3_endpoint or "127.0.0.1" in s3_endpoint
+            # P0-A: Enhanced LocalStack detection
+            endpoint_lower = s3_endpoint.lower()
+            is_localstack = any(
+                marker in endpoint_lower
+                for marker in ["localhost", "127.0.0.1", "localstack", "host.docker.internal"]
+            )
             if is_localstack and not os.getenv("AWS_ACCESS_KEY_ID"):
                 s3_kwargs["aws_access_key_id"] = "test"
                 s3_kwargs["aws_secret_access_key"] = "test"

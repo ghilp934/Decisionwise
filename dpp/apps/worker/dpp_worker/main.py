@@ -32,38 +32,60 @@ def main() -> None:
             "DATABASE_URL not set, using default: %s",
             database_url.replace("dpp_pass", "***"),
         )
-    sqs_queue_url = os.getenv("SQS_QUEUE_URL", "http://localhost:4566/000000000000/dpp-runs")
-    s3_result_bucket = os.getenv("S3_RESULT_BUCKET", "dpp-results")
 
-    # AWS clients (LocalStack for dev)
-    sqs_endpoint = os.getenv("SQS_ENDPOINT_URL", "http://localhost:4566")
-    s3_endpoint = os.getenv("S3_ENDPOINT_URL", "http://localhost:4566")
+    # P0-A: NO DEFAULTS for production safety
+    sqs_queue_url = os.getenv("SQS_QUEUE_URL")
+    if not sqs_queue_url:
+        raise ValueError(
+            "SQS_QUEUE_URL is required. "
+            "Set SQS_QUEUE_URL (and optionally SQS_ENDPOINT_URL for LocalStack)."
+        )
 
-    # P0-2: Only use test credentials for LocalStack
-    # Production uses boto3 default credential chain (IAM roles, env vars, etc.)
+    # P0-B: Canonical env var with backward compatibility
+    s3_result_bucket = os.getenv("S3_RESULT_BUCKET") or os.getenv("DPP_RESULTS_BUCKET")
+    if not s3_result_bucket:
+        raise ValueError(
+            "S3_RESULT_BUCKET (or DPP_RESULTS_BUCKET) is required."
+        )
+
+    # P0-A: AWS clients - NO defaults for endpoint_url
+    sqs_endpoint = os.getenv("SQS_ENDPOINT_URL")  # None if not set
+    s3_endpoint = os.getenv("S3_ENDPOINT_URL")    # None if not set
+
+    # P0-A: Enhanced LocalStack detection
     def is_localstack(endpoint: str | None) -> bool:
-        """Check if endpoint is LocalStack."""
-        return endpoint is not None and ("localhost" in endpoint or "127.0.0.1" in endpoint)
+        """Check if endpoint is LocalStack or local development."""
+        if endpoint is None:
+            return False
+        endpoint_lower = endpoint.lower()
+        return any(
+            marker in endpoint_lower
+            for marker in ["localhost", "127.0.0.1", "localstack", "host.docker.internal"]
+        )
 
-    sqs_kwargs = {
-        "endpoint_url": sqs_endpoint,
-        "region_name": "us-east-1",
-    }
-    if is_localstack(sqs_endpoint):
-        sqs_kwargs["aws_access_key_id"] = "test"
-        sqs_kwargs["aws_secret_access_key"] = "test"
-        logger.info("Using LocalStack test credentials for SQS")
+    # SQS client: conditional endpoint_url
+    sqs_kwargs = {"region_name": os.getenv("AWS_REGION", "us-east-1")}
+
+    if sqs_endpoint:
+        sqs_kwargs["endpoint_url"] = sqs_endpoint
+        # P0-A: Inject test credentials ONLY for LocalStack
+        if is_localstack(sqs_endpoint) and not os.getenv("AWS_ACCESS_KEY_ID"):
+            sqs_kwargs["aws_access_key_id"] = "test"
+            sqs_kwargs["aws_secret_access_key"] = "test"
+            logger.info("Using LocalStack test credentials for SQS")
 
     sqs_client = boto3.client("sqs", **sqs_kwargs)
 
-    s3_kwargs = {
-        "endpoint_url": s3_endpoint,
-        "region_name": "us-east-1",
-    }
-    if is_localstack(s3_endpoint):
-        s3_kwargs["aws_access_key_id"] = "test"
-        s3_kwargs["aws_secret_access_key"] = "test"
-        logger.info("Using LocalStack test credentials for S3")
+    # S3 client: conditional endpoint_url
+    s3_kwargs = {"region_name": os.getenv("AWS_REGION", "us-east-1")}
+
+    if s3_endpoint:
+        s3_kwargs["endpoint_url"] = s3_endpoint
+        # P0-A: Inject test credentials ONLY for LocalStack
+        if is_localstack(s3_endpoint) and not os.getenv("AWS_ACCESS_KEY_ID"):
+            s3_kwargs["aws_access_key_id"] = "test"
+            s3_kwargs["aws_secret_access_key"] = "test"
+            logger.info("Using LocalStack test credentials for S3")
 
     s3_client = boto3.client("s3", **s3_kwargs)
 
