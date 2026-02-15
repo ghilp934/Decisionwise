@@ -69,3 +69,6 @@ tmp/
 temp/
 *.backup
 *.bak
+
+# Evidence (temporary verification files)
+evidence/

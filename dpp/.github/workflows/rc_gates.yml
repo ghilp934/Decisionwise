@@ -1,0 +1,182 @@
+name: RC Gates
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+      - 'release/**'
+  workflow_dispatch:
+    inputs:
+      run_windows:
+        description: 'Run Windows job (default: false)'
+        required: false
+        type: boolean
+        default: false
+      retention_days:
+        description: 'Artifact retention days (default: 7)'
+        required: false
+        type: number
+        default: 7
+  schedule:
+    # Daily at 09:00 KST (00:00 UTC)
+    - cron: '0 0 * * *'
+
+# Minimal permissions (write for PR comments)
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  rc_gates_linux:
+    name: RC Gates (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: rc-gates-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Docker environment info (evidence)
+        run: |
+          docker --version
+          docker compose version
+          docker info
+
+      - name: Execute RC gates
+        run: |
+          chmod +x tools/run_rc_gates.sh
+          bash tools/run_rc_gates.sh
+
+      - name: Extract RC summary
+        id: rc_summary
+        if: always()
+        run: |
+          # Find latest evidence directory
+          latest_dir=$(ls -1dt evidence/01_ci/* 2>/dev/null | head -1 || echo "")
+
+          if [ -z "$latest_dir" ]; then
+            echo "latest_dir=N/A" >> "$GITHUB_OUTPUT"
+            echo "status=UNKNOWN" >> "$GITHUB_OUTPUT"
+            echo "fail_nodeid=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Search for first FAILED line in stdout/stderr
+          fail_line=$(grep -hE '^FAILED ' "$latest_dir/rc_run_stdout.log" "$latest_dir/rc_run_stderr.log" 2>/dev/null | head -1 || echo "")
+
+          # Determine status and extract nodeid
+          if [ -n "$fail_line" ]; then
+            status="FAIL"
+            nodeid=$(echo "$fail_line" | awk '{print $2}')
+          else
+            status="PASS"
+            nodeid=""
+          fi
+
+          # Output to GITHUB_OUTPUT
+          echo "latest_dir=$latest_dir" >> "$GITHUB_OUTPUT"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "fail_nodeid=$nodeid" >> "$GITHUB_OUTPUT"
+
+          # Debug output
+          echo "Latest evidence: $latest_dir"
+          echo "Status: $status"
+          echo "First failure nodeid: $nodeid"
+
+      - name: Find existing PR comment
+        id: find_comment
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '<!-- RC_GATES_SUMMARY -->'
+
+      - name: Create or update PR comment
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
+        uses: peter-evans/create-or-update-comment@v4
+        continue-on-error: true
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-id: ${{ steps.find_comment.outputs.comment-id }}
+          edit-mode: replace
+          body: |
+            <!-- RC_GATES_SUMMARY -->
+            ### RC Gates: ${{ steps.rc_summary.outputs.status }}
+
+            **Latest evidence:** `${{ steps.rc_summary.outputs.latest_dir }}`
+
+            **First failure nodeid:** ${{ steps.rc_summary.outputs.fail_nodeid || 'N/A' }}
+
+            ---
+            _Workflow run: [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})_
+
+      - name: Upload evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-gates-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/01_ci/**
+          retention-days: ${{ github.event.inputs.retention_days || 7 }}
+          if-no-files-found: warn
+
+  rc_gates_windows:
+    name: RC Gates (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_windows == 'true'
+    concurrency:
+      group: rc-gates-windows-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Docker environment info (evidence)
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Execute RC gates (PowerShell)
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File tools\run_rc_gates.ps1
+
+      - name: Upload evidence artifact (Windows)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-gates-windows-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/01_ci/**
+          retention-days: ${{ github.event.inputs.retention_days || 7 }}
+          if-no-files-found: warn

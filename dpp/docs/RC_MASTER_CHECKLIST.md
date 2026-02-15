@@ -30,26 +30,112 @@ Last Updated: 2026-02-15 (Asia/Seoul)
 [5] Paid Pilot Kickoff 준비(결제/정산/운영·지원 프로토콜 + 계약 문서 묶음)
 
 ────────────────────────────────────────
-2) RC 게이트(자동검증) 요약
+2) RC Gate One-shot Execution (자동화 스크립트 우선)
 
 실행 기본값(로컬):
 - 프로젝트 루트: dpp/
 - Python: 3.12+
 - 설치: `pip install -e '.[dev]'`
+- Docker + Docker Compose 필요 (postgres/redis/localstack 자동 기동)
 
-전체 RC 게이트 1회전(권장):
+────────────────────────────────────────
+2-A) 원샷 실행 (스크립트 — 1순위 권장)
+
+**Mac/Linux:**
 ```bash
-pytest -q \
+bash tools/run_rc_gates.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\run_rc_gates.ps1
+```
+
+스크립트 기능:
+- 전체 RC 게이트(RC-1 ~ RC-9) 자동 실행
+- Docker 의존성 자동 시작 (postgres/redis/localstack)
+- RC-5용 이미지 3종 자동 빌드 (dpp-api/worker/reaper:rc-test)
+- 실패 시 자동 로그 덤프 (docker compose logs + 상태)
+- Evidence Pack 자동 저장: `evidence/01_ci/<timestamp>/`
+
+증빙 출력:
+- `rc_run_cmd.txt` — 실행된 pytest 커맨드 원문
+- `rc_run_stdout.log` — 테스트 표준 출력
+- `rc_run_stderr.log` — 테스트 오류 출력
+- `rc_run_env.txt` — 환경 스냅샷 (Python/Docker/Compose 버전)
+- `dump_logs/` — 실패 시에만 생성 (Docker 서비스 로그)
+
+────────────────────────────────────────
+2-B) 수동 실행 (Fallback — 스크립트 실패 시)
+
+환경변수 설정:
+```bash
+export DATABASE_URL="postgresql://dpp_user:dpp_pass@localhost:5432/dpp"
+export REDIS_URL="redis://localhost:6379/0"
+export AWS_ENDPOINT_URL="http://localhost:4566"
+export AWS_ACCESS_KEY_ID="test"
+export AWS_SECRET_ACCESS_KEY="test"
+export AWS_DEFAULT_REGION="us-east-1"
+```
+
+Docker 서비스 시작:
+```bash
+cd infra
+docker compose up -d
+# 서비스가 healthy 상태가 될 때까지 대기 (docker compose ps 확인)
+```
+
+이미지 빌드 (RC-5 요구사항):
+```bash
+docker build -f Dockerfile.api -t dpp-api:rc-test .
+docker build -f Dockerfile.worker -t dpp-worker:rc-test .
+docker build -f Dockerfile.reaper -t dpp-reaper:rc-test .
+```
+
+전체 RC 게이트 실행:
+```bash
+pytest -q -o addopts= --maxfail=1 \
   apps/api/tests/test_rc1_contract.py \
   apps/api/tests/test_rc2_error_format.py \
   apps/api/tests/test_rc3_rate_limit_headers.py \
   apps/api/tests/test_rc4_billing_invariants.py \
+  apps/worker/tests/test_rc4_finalize_invariants.py \
   apps/api/tests/test_rc5_gate.py \
   apps/api/tests/test_rc6_observability.py \
   apps/api/tests/test_rc7_otel_contract.py \
   apps/api/tests/test_rc8_release_packet_gate.py \
   apps/api/tests/test_rc9_ops_pack_gate.py
 ```
+
+주의사항:
+- `-o addopts=`: pytest.ini/pyproject.toml의 addopts 충돌 회피 (필수)
+- `--maxfail=1`: 첫 실패에서 중단 (빠른 피드백)
+- RC-4는 API + Worker 테스트 모두 실행
+
+────────────────────────────────────────
+2-C) 흔한 실패 패턴 및 즉시조치
+
+(A) Postgres/Redis 연결 실패
+- 증상: `connection refused`, `could not connect`
+- 조치:
+  1. `docker compose -f infra/docker-compose.yml ps` (상태 확인)
+  2. `docker compose -f infra/docker-compose.yml logs --tail 200 postgres`
+  3. 재시작: `docker compose -f infra/docker-compose.yml restart postgres redis`
+
+(B) Docker 이미지 없음 (RC-5)
+- 증상: `image not found: dpp-api:rc-test`
+- 조치:
+  1. `docker images | grep dpp` (이미지 목록 확인)
+  2. 재빌드: `docker build -f Dockerfile.api -t dpp-api:rc-test .` (및 worker/reaper)
+
+(C) pytest 옵션 충돌
+- 증상: `pytest: error: unrecognized arguments: --cov`
+- 조치:
+  1. 스크립트는 이미 `-o addopts=` 포함 (자동 회피)
+  2. 수동 실행 시 반드시 `-o addopts=` 사용
+  3. 필요 시 재설치: `pip install -e '.[dev]'`
+
+상세 가이드: `/tools/README_RC_GATES.md`
 
 
 ────────────────────────────────────────
