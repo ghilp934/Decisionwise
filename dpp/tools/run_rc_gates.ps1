@@ -167,7 +167,12 @@ $(docker compose -f "$RepoRoot\infra\docker-compose.yml" ps 2>&1)
     Pop-Location
 
     # Display output
-    Get-Content $StdoutFile | Write-Host
+    if (Test-Path $StdoutFile) {
+        Get-Content $StdoutFile | Write-Host
+    } else {
+        Write-Host "ERROR: rc_run_stdout.log not found!" -ForegroundColor Red
+    }
+
     if (Test-Path $StderrFile) {
         $StderrContent = Get-Content $StderrFile -Raw
         if ($StderrContent.Trim().Length -gt 0) {

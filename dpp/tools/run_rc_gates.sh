@@ -147,14 +147,20 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 set +e  # Temporarily disable exit on error to capture exit code
 $PYTEST_CMD > "$EVIDENCE_DIR/rc_run_stdout.log" 2> "$EVIDENCE_DIR/rc_run_stderr.log"
 PYTEST_EXIT_CODE=$?
-set -e
 
-# Copy stdout/stderr to console
-cat "$EVIDENCE_DIR/rc_run_stdout.log"
+# Copy stdout/stderr to console (keep set +e to prevent ERR trap on cat failure)
+if [[ -f "$EVIDENCE_DIR/rc_run_stdout.log" ]]; then
+  cat "$EVIDENCE_DIR/rc_run_stdout.log"
+else
+  echo -e "${RED}ERROR: rc_run_stdout.log not found!${NC}"
+fi
+
 if [[ -s "$EVIDENCE_DIR/rc_run_stderr.log" ]]; then
   echo -e "${YELLOW}--- STDERR ---${NC}"
   cat "$EVIDENCE_DIR/rc_run_stderr.log"
 fi
+
+set -e  # Re-enable exit on error after output handling
 
 # Check result
 if [[ $PYTEST_EXIT_CODE -eq 0 ]]; then
