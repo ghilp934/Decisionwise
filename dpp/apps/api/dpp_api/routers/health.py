@@ -63,7 +63,7 @@ def check_redis() -> str:
 def check_sqs() -> str:
     """Check SQS connectivity.
 
-    Ops Hardening v2: Reuse get_sqs_client() (now with fail-fast queue URL validation).
+    Ops Hardening v2 + P1: Use GetQueueAttributes on configured queue (more specific than list_queues).
 
     Returns:
         str: "up" if healthy, error message otherwise
@@ -72,8 +72,12 @@ def check_sqs() -> str:
         from dpp_api.queue.sqs_client import get_sqs_client
 
         sqs_client = get_sqs_client()
-        # Simple list_queues to verify connectivity
-        sqs_client.client.list_queues()
+        # P1: Use GetQueueAttributes on the configured queue URL (more specific check)
+        # This verifies both connectivity AND that the queue exists/is accessible
+        sqs_client.client.get_queue_attributes(
+            QueueUrl=sqs_client.queue_url,
+            AttributeNames=["ApproximateNumberOfMessages"]
+        )
         return "up"
     except ValueError as e:
         # Config error (missing env var)

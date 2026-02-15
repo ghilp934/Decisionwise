@@ -17,8 +17,16 @@ RUN pip install --no-cache-dir -e .
 
 # Copy application code
 COPY apps/reaper/dpp_reaper ./apps/reaper/dpp_reaper
+# P0: Reaper imports dpp_api modules (budget, redis_client, utils, storage)
+COPY apps/api/dpp_api ./apps/api/dpp_api
 COPY alembic ./alembic
 COPY alembic.ini ./
+
+# P0: Set PYTHONPATH to include both reaper and api modules
+ENV PYTHONPATH="/app/apps/api:/app/apps/reaper:${PYTHONPATH}"
+
+# P0: Smoke import check - verify all dependencies resolve without starting loops
+RUN python -c "import dpp_reaper.main; print('Reaper import smoke check: OK')"
 
 # Create non-root user
 RUN useradd -m -u 1000 dpp && chown -R dpp:dpp /app
