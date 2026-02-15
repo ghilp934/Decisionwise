@@ -37,6 +37,24 @@ RC_TESTS=(
 # Auto-dump logs on failure
 DumpLogs() {
   local exit_code=$?
+
+  # CRITICAL: Display pytest output FIRST if files exist (before any other output)
+  if [[ -f "$EVIDENCE_DIR/rc_run_stdout.log" ]]; then
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}PYTEST STDOUT:${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    cat "$EVIDENCE_DIR/rc_run_stdout.log" || echo "Failed to cat stdout"
+  else
+    echo -e "${RED}WARNING: rc_run_stdout.log not found at $EVIDENCE_DIR/${NC}"
+  fi
+
+  if [[ -f "$EVIDENCE_DIR/rc_run_stderr.log" && -s "$EVIDENCE_DIR/rc_run_stderr.log" ]]; then
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}PYTEST STDERR:${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    cat "$EVIDENCE_DIR/rc_run_stderr.log" || echo "Failed to cat stderr"
+  fi
+
   echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo -e "${RED}[FAILURE DETECTED] Exit code: $exit_code${NC}"
   echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -122,6 +140,12 @@ export AWS_ACCESS_KEY_ID="test"
 export AWS_SECRET_ACCESS_KEY="test"
 export AWS_DEFAULT_REGION="us-east-1"
 
+# Ops Hardening v2: Service-specific endpoints and required env vars
+export S3_ENDPOINT_URL="http://localhost:4566"
+export SQS_ENDPOINT_URL="http://localhost:4566"
+export S3_RESULT_BUCKET="dpp-results-test"
+export SQS_QUEUE_URL="http://localhost:4566/000000000000/dpp-runs"
+
 # Step 5: Construct pytest command
 echo -e "${YELLOW}[5/6] Constructing pytest command...${NC}"
 PYTEST_CMD="pytest -q -o addopts= --maxfail=1"
@@ -141,14 +165,20 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 set +e  # Temporarily disable exit on error to capture exit code
 $PYTEST_CMD > "$EVIDENCE_DIR/rc_run_stdout.log" 2> "$EVIDENCE_DIR/rc_run_stderr.log"
 PYTEST_EXIT_CODE=$?
-set -e
 
-# Copy stdout/stderr to console
-cat "$EVIDENCE_DIR/rc_run_stdout.log"
+# Copy stdout/stderr to console (keep set +e to prevent ERR trap on cat failure)
+if [[ -f "$EVIDENCE_DIR/rc_run_stdout.log" ]]; then
+  cat "$EVIDENCE_DIR/rc_run_stdout.log"
+else
+  echo -e "${RED}ERROR: rc_run_stdout.log not found!${NC}"
+fi
+
 if [[ -s "$EVIDENCE_DIR/rc_run_stderr.log" ]]; then
   echo -e "${YELLOW}--- STDERR ---${NC}"
   cat "$EVIDENCE_DIR/rc_run_stderr.log"
 fi
+
+set -e  # Re-enable exit on error after output handling
 
 # Check result
 if [[ $PYTEST_EXIT_CODE -eq 0 ]]; then

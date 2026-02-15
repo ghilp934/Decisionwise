@@ -41,6 +41,18 @@ def test_ratelimit_middleware_respects_handler_headers(monkeypatch):
         """Handler that does NOT set RateLimit headers."""
         return {"message": "no custom headers"}
 
+    @test_router.get("/v1/test-policy-only")
+    def policy_only_handler(response: Response):
+        """Handler that sets ONLY RateLimit-Policy."""
+        response.headers["RateLimit-Policy"] = '"custom-policy"; q=200; w=7200'
+        return {"message": "policy only"}
+
+    @test_router.get("/v1/test-limit-only")
+    def limit_only_handler(response: Response):
+        """Handler that sets ONLY RateLimit."""
+        response.headers["RateLimit"] = '"custom-limit"; r=150; t=5000'
+        return {"message": "limit only"}
+
     # Include router before adding middleware
     test_app.include_router(test_router)
 
@@ -49,22 +61,24 @@ def test_ratelimit_middleware_respects_handler_headers(monkeypatch):
     async def rate_limit_middleware(request, call_next):
         response = await call_next(request)
 
-        # Only add headers for successful responses
+        # P1-C: Add headers for successful responses (fill missing only)
         if 200 <= response.status_code < 300:
-            # P0-4: Check if handler already set RateLimit headers
+            # Check if handler already set RateLimit headers
             handler_set_policy = "RateLimit-Policy" in response.headers
             handler_set_limit = "RateLimit" in response.headers
 
-            # Only add defaults if handler did NOT set them
-            if not handler_set_policy and not handler_set_limit:
+            # Fill missing headers (preserve handler-set values)
+            if not handler_set_policy or not handler_set_limit:
                 rate_limiter = test_app.state.rate_limiter
                 result = rate_limiter.check_rate_limit(key="test", path=str(request.url.path))
 
-                rate_limit_policy = f'"{result.policy_id}"; q={result.quota}; w={result.window}'
-                rate_limit = f'"{result.policy_id}"; r={result.remaining}; t={result.reset}'
+                if not handler_set_policy:
+                    rate_limit_policy = f'"{result.policy_id}"; q={result.quota}; w={result.window}'
+                    response.headers["RateLimit-Policy"] = rate_limit_policy
 
-                response.headers["RateLimit-Policy"] = rate_limit_policy
-                response.headers["RateLimit"] = rate_limit
+                if not handler_set_limit:
+                    rate_limit = f'"{result.policy_id}"; r={result.remaining}; t={result.reset}'
+                    response.headers["RateLimit"] = rate_limit
 
         return response
 
@@ -84,3 +98,23 @@ def test_ratelimit_middleware_respects_handler_headers(monkeypatch):
     # Defaults from NoOpRateLimiter (quota=60, window=60)
     assert 'q=60' in resp2.headers["RateLimit-Policy"]
     assert 'w=60' in resp2.headers["RateLimit-Policy"]
+
+    # Test 3: Handler sets ONLY Policy -> middleware adds default Limit
+    resp3 = client.get("/v1/test-policy-only")
+    assert resp3.status_code == 200
+    # Handler-set Policy preserved
+    assert resp3.headers["RateLimit-Policy"] == '"custom-policy"; q=200; w=7200'
+    # Middleware-added default Limit
+    assert "RateLimit" in resp3.headers
+    assert 'default' in resp3.headers["RateLimit"]
+    assert 'r=' in resp3.headers["RateLimit"]
+
+    # Test 4: Handler sets ONLY Limit -> middleware adds default Policy
+    resp4 = client.get("/v1/test-limit-only")
+    assert resp4.status_code == 200
+    # Handler-set Limit preserved
+    assert resp4.headers["RateLimit"] == '"custom-limit"; r=150; t=5000'
+    # Middleware-added default Policy
+    assert "RateLimit-Policy" in resp4.headers
+    assert 'default' in resp4.headers["RateLimit-Policy"]
+    assert 'q=60' in resp4.headers["RateLimit-Policy"]

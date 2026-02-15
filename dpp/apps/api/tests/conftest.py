@@ -36,6 +36,43 @@ REDIS_TEST_PORT = 6379
 REDIS_TEST_DB = 15  # Use separate DB for tests
 
 
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_env_vars():
+    """
+    Setup required environment variables for tests.
+
+    Ops Hardening v2: S3_RESULT_BUCKET and SQS_QUEUE_URL are now required.
+    This fixture ensures they're set for all tests.
+    """
+    # Save original env vars
+    original_env = {}
+
+    # Define test env vars
+    test_env = {
+        "S3_RESULT_BUCKET": os.getenv("S3_RESULT_BUCKET", "dpp-results-test"),
+        "SQS_QUEUE_URL": os.getenv("SQS_QUEUE_URL", "http://localhost:4566/000000000000/dpp-runs"),
+        "SQS_ENDPOINT_URL": os.getenv("SQS_ENDPOINT_URL", "http://localhost:4566"),
+        "S3_ENDPOINT_URL": os.getenv("S3_ENDPOINT_URL", "http://localhost:4566"),
+    }
+
+    # Set test env vars (only if not already set)
+    for key, value in test_env.items():
+        if key not in os.environ:
+            original_env[key] = None
+            os.environ[key] = value
+        else:
+            original_env[key] = os.environ[key]
+
+    yield
+
+    # Restore original env vars
+    for key, original_value in original_env.items():
+        if original_value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = original_value
+
+
 @pytest.fixture(scope="function")
 def db_session() -> Session:
     """
@@ -94,15 +131,12 @@ def redis_client() -> redis.Redis:
     Uses Redis DB 15 for tests and flushes it before each test.
     RC-4: Force production RedisClient singleton to use TEST DB.
     """
-    from dpp_api.db import redis_client as rc_cfg
     from dpp_api.db.redis_client import RedisClient
 
-    # RC-4 Safety: Force production code to use TEST DB
-    original_db = rc_cfg.REDIS_DB
-    rc_cfg.REDIS_DB = REDIS_TEST_DB
+    # RC-4 Safety: Reset singleton before test
     RedisClient.reset()
 
-    # Create test client
+    # Create test client with explicit test DB
     client = redis.Redis(
         host=REDIS_TEST_HOST,
         port=REDIS_TEST_PORT,
@@ -121,8 +155,7 @@ def redis_client() -> redis.Redis:
     finally:
         # Clean up after test
         client.flushdb()
-        # Restore original config and reset singleton
-        rc_cfg.REDIS_DB = original_db
+        # Reset singleton to clean state
         RedisClient.reset()
 
 

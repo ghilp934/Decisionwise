@@ -17,8 +17,18 @@ RUN pip install --no-cache-dir -e .
 
 # Copy application code
 COPY apps/worker/dpp_worker ./apps/worker/dpp_worker
+# P0: Worker imports dpp_api modules (budget, redis_client, utils, storage, queue)
+COPY apps/api/dpp_api ./apps/api/dpp_api
+# P0: Worker tests import dpp_reaper modules (reconcile_loop)
+COPY apps/reaper/dpp_reaper ./apps/reaper/dpp_reaper
 COPY alembic ./alembic
 COPY alembic.ini ./
+
+# P0: Set PYTHONPATH to include api, worker, and reaper modules
+ENV PYTHONPATH="/app/apps/api:/app/apps/worker:/app/apps/reaper:${PYTHONPATH}"
+
+# P0: Smoke import check - verify all dependencies resolve without starting loops
+RUN python -c "import dpp_worker.main; print('Worker import smoke check: OK')"
 
 # Create non-root user
 RUN useradd -m -u 1000 dpp && chown -R dpp:dpp /app
