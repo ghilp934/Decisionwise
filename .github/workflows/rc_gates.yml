@@ -60,6 +60,11 @@ jobs:
           docker compose version
           docker info
 
+      - name: Build docker images for RC-5 gate
+        run: |
+          cd dpp
+          docker compose build api reaper worker
+
       - name: Execute RC gates
         run: |
           chmod +x dpp/tools/run_rc_gates.sh
