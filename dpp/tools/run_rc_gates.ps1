@@ -136,6 +136,12 @@ $(docker compose -f "$RepoRoot\infra\docker-compose.yml" ps 2>&1)
     $env:AWS_SECRET_ACCESS_KEY = "test"
     $env:AWS_DEFAULT_REGION = "us-east-1"
 
+    # Ops Hardening v2: Service-specific endpoints and required env vars
+    $env:S3_ENDPOINT_URL = "http://localhost:4566"
+    $env:SQS_ENDPOINT_URL = "http://localhost:4566"
+    $env:S3_RESULT_BUCKET = "dpp-results-test"
+    $env:SQS_QUEUE_URL = "http://localhost:4566/000000000000/dpp-runs"
+
     # Step 5: Construct pytest command
     Write-Host "[5/6] Constructing pytest command..." -ForegroundColor Yellow
     $PytestArgs = @("-q", "-o", "addopts=", "--maxfail=1") + $RcTests

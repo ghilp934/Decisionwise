@@ -122,6 +122,12 @@ export AWS_ACCESS_KEY_ID="test"
 export AWS_SECRET_ACCESS_KEY="test"
 export AWS_DEFAULT_REGION="us-east-1"
 
+# Ops Hardening v2: Service-specific endpoints and required env vars
+export S3_ENDPOINT_URL="http://localhost:4566"
+export SQS_ENDPOINT_URL="http://localhost:4566"
+export S3_RESULT_BUCKET="dpp-results-test"
+export SQS_QUEUE_URL="http://localhost:4566/000000000000/dpp-runs"
+
 # Step 5: Construct pytest command
 echo -e "${YELLOW}[5/6] Constructing pytest command...${NC}"
 PYTEST_CMD="pytest -q -o addopts= --maxfail=1"
