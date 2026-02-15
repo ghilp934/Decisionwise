@@ -85,15 +85,12 @@ def redis_client() -> redis.Redis:
     Uses Redis DB 15 for tests and flushes it before each test.
     RC-4: Force production RedisClient singleton to use TEST DB.
     """
-    from dpp_api.db import redis_client as rc_cfg
     from dpp_api.db.redis_client import RedisClient
 
-    # RC-4 Safety: Force production code to use TEST DB
-    original_db = rc_cfg.REDIS_DB
-    rc_cfg.REDIS_DB = REDIS_TEST_DB
+    # RC-4 Safety: Reset singleton before test
     RedisClient.reset()
 
-    # Create test client
+    # Create test client with explicit test DB
     client = redis.Redis(
         host=REDIS_TEST_HOST,
         port=REDIS_TEST_PORT,
@@ -112,8 +109,7 @@ def redis_client() -> redis.Redis:
     finally:
         # Clean up after test
         client.flushdb()
-        # Restore original config and reset singleton
-        rc_cfg.REDIS_DB = original_db
+        # Reset singleton to clean state
         RedisClient.reset()
 
 

@@ -1,4 +1,7 @@
-"""SQS client for enqueueing runs."""
+"""SQS client for enqueueing runs.
+
+Ops Hardening v2: Remove hardcoded localhost queue URL, enhance LocalStack detection.
+"""
 
 import json
 import os
@@ -6,6 +9,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 import boto3
+
+from dpp_api.config.env import get_sqs_queue_url, is_localstack_endpoint
 
 
 class SQSClient:
@@ -15,41 +20,32 @@ class SQSClient:
         """
         Initialize SQS client.
 
-        P0-2: NO implicit localstack in prod.
+        Ops Hardening v2: NO hardcoded localhost defaults, enhanced LocalStack detection.
         - SQS_ENDPOINT_URL: Only used if explicitly set (no default)
-        - SQS_QUEUE_URL: Required in prod, allowed default only if endpoint_url exists
-        - Credentials: Only use dummy for LocalStack (when endpoint_url is set)
+        - SQS_QUEUE_URL: ALWAYS required (fail-fast if missing)
+        - Credentials: Only inject "test" for LocalStack (4-marker detection)
+
+        Raises:
+            ValueError: If SQS_QUEUE_URL is missing
         """
-        sqs_endpoint = os.getenv("SQS_ENDPOINT_URL")  # No default!
-        sqs_queue_url = os.getenv("SQS_QUEUE_URL")
+        sqs_endpoint = os.getenv("SQS_ENDPOINT_URL")  # Optional: LocalStack only
 
-        # P0-2: Validate queue URL configuration
-        if not sqs_endpoint and not sqs_queue_url:
-            raise ValueError(
-                "SQS_QUEUE_URL is required in production. "
-                "Set SQS_QUEUE_URL or SQS_ENDPOINT_URL for LocalStack."
-            )
-
-        # If endpoint_url exists (LocalStack), allow default queue URL
-        if sqs_endpoint and not sqs_queue_url:
-            sqs_queue_url = "http://localhost:4566/000000000000/dpp-runs"
-
-        self.queue_url = sqs_queue_url
+        # Ops Hardening v2: SQS_QUEUE_URL is ALWAYS required (no hardcoded defaults)
+        self.queue_url = get_sqs_queue_url()  # Raises ValueError if missing
 
         # Build boto3 kwargs
         sqs_kwargs = {"region_name": os.getenv("AWS_REGION", "us-east-1")}
 
-        # P0-2: endpoint_url only if explicitly set
+        # Ops Hardening v2: endpoint_url only if explicitly set
         if sqs_endpoint:
             sqs_kwargs["endpoint_url"] = sqs_endpoint
 
-            # P0-2: Dummy credentials ONLY for LocalStack (localhost/127.0.0.1)
-            is_localstack = "localhost" in sqs_endpoint or "127.0.0.1" in sqs_endpoint
-            if is_localstack and not os.getenv("AWS_ACCESS_KEY_ID"):
+            # Ops Hardening v2: Enhanced LocalStack detection (4 markers)
+            if is_localstack_endpoint(sqs_endpoint) and not os.getenv("AWS_ACCESS_KEY_ID"):
                 sqs_kwargs["aws_access_key_id"] = "test"
                 sqs_kwargs["aws_secret_access_key"] = "test"
 
-        # Explicit credentials if provided
+        # Explicit credentials if provided (override test creds)
         if os.getenv("AWS_ACCESS_KEY_ID"):
             sqs_kwargs["aws_access_key_id"] = os.getenv("AWS_ACCESS_KEY_ID")
         if os.getenv("AWS_SECRET_ACCESS_KEY"):

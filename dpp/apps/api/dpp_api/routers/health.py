@@ -1,4 +1,7 @@
-"""Health check endpoints."""
+"""Health check endpoints.
+
+Ops Hardening v2: Use centralized env helpers.
+"""
 
 import logging
 import os
@@ -8,6 +11,7 @@ from fastapi import APIRouter, Response, status
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from dpp_api.config.env import get_s3_result_bucket, is_localstack_endpoint
 from dpp_api.db.redis_client import RedisClient
 from dpp_api.db.session import engine
 
@@ -59,7 +63,7 @@ def check_redis() -> str:
 def check_sqs() -> str:
     """Check SQS connectivity.
 
-    P0-2: Reuse get_sqs_client() instead of hardcoding test credentials.
+    Ops Hardening v2 + P1: Use GetQueueAttributes on configured queue (more specific than list_queues).
 
     Returns:
         str: "up" if healthy, error message otherwise
@@ -68,9 +72,17 @@ def check_sqs() -> str:
         from dpp_api.queue.sqs_client import get_sqs_client
 
         sqs_client = get_sqs_client()
-        # Simple list_queues to verify connectivity
-        sqs_client.client.list_queues()
+        # P1: Use GetQueueAttributes on the configured queue URL (more specific check)
+        # This verifies both connectivity AND that the queue exists/is accessible
+        sqs_client.client.get_queue_attributes(
+            QueueUrl=sqs_client.queue_url,
+            AttributeNames=["ApproximateNumberOfMessages"]
+        )
         return "up"
+    except ValueError as e:
+        # Config error (missing env var)
+        logger.error(f"SQS config error: {e}")
+        return f"down: config error - {str(e)[:40]}"
     except Exception as e:
         logger.error(f"SQS health check failed: {e}")
         return f"down: {str(e)[:50]}"
@@ -79,17 +91,14 @@ def check_sqs() -> str:
 def check_s3() -> str:
     """Check S3 connectivity.
 
-    P0-2 + P1-1: Bucket-scoped check (no ListAllMyBuckets).
-    Uses head_bucket on DPP_RESULTS_BUCKET instead.
+    Ops Hardening v2: Use centralized bucket resolver (fail-fast if missing).
 
     Returns:
         str: "up" if healthy, error message otherwise
     """
     try:
-        # P1-1: Use bucket-scoped check
-        results_bucket = os.getenv("DPP_RESULTS_BUCKET")
-        if not results_bucket:
-            return "down: DPP_RESULTS_BUCKET not configured"
+        # Ops Hardening v2: Use centralized resolver (raises ValueError if missing)
+        results_bucket = get_s3_result_bucket()
 
         # P0-2: Conditional endpoint_url and credentials
         s3_endpoint = os.getenv("S3_ENDPOINT_URL")
@@ -97,9 +106,8 @@ def check_s3() -> str:
 
         if s3_endpoint:
             s3_kwargs["endpoint_url"] = s3_endpoint
-            # Dummy credentials ONLY for LocalStack (localhost/127.0.0.1)
-            is_localstack = "localhost" in s3_endpoint or "127.0.0.1" in s3_endpoint
-            if is_localstack and not os.getenv("AWS_ACCESS_KEY_ID"):
+            # Ops Hardening v2: Enhanced LocalStack detection (4 markers)
+            if is_localstack_endpoint(s3_endpoint) and not os.getenv("AWS_ACCESS_KEY_ID"):
                 s3_kwargs["aws_access_key_id"] = "test"
                 s3_kwargs["aws_secret_access_key"] = "test"
 
@@ -114,6 +122,10 @@ def check_s3() -> str:
         # P1-1: head_bucket instead of list_buckets
         s3_client.head_bucket(Bucket=results_bucket)
         return "up"
+    except ValueError as e:
+        # Config error (missing env var)
+        logger.error(f"S3 config error: {e}")
+        return f"down: config error - {str(e)[:40]}"
     except Exception as e:
         logger.error(f"S3 health check failed: {e}")
         return f"down: {str(e)[:50]}"

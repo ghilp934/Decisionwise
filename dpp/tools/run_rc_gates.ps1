@@ -31,6 +31,29 @@ $RcTests = @(
 function Dump-Logs {
     param([int]$ExitCode)
 
+    # CRITICAL: Display pytest output FIRST if files exist (before any other output)
+    $StdoutFile = Join-Path $EvidenceDir "rc_run_stdout.log"
+    $StderrFile = Join-Path $EvidenceDir "rc_run_stderr.log"
+
+    if (Test-Path $StdoutFile) {
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
+        Write-Host "PYTEST STDOUT:" -ForegroundColor Yellow
+        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
+        Get-Content $StdoutFile | Write-Host
+    } else {
+        Write-Host "WARNING: rc_run_stdout.log not found at $EvidenceDir" -ForegroundColor Red
+    }
+
+    if (Test-Path $StderrFile) {
+        $StderrContent = Get-Content $StderrFile -Raw
+        if ($StderrContent.Trim().Length -gt 0) {
+            Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
+            Write-Host "PYTEST STDERR:" -ForegroundColor Yellow
+            Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
+            Write-Host $StderrContent
+        }
+    }
+
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
     Write-Host "[FAILURE DETECTED] Exit code: $ExitCode" -ForegroundColor Red
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Yellow
@@ -136,6 +159,12 @@ $(docker compose -f "$RepoRoot\infra\docker-compose.yml" ps 2>&1)
     $env:AWS_SECRET_ACCESS_KEY = "test"
     $env:AWS_DEFAULT_REGION = "us-east-1"
 
+    # Ops Hardening v2: Service-specific endpoints and required env vars
+    $env:S3_ENDPOINT_URL = "http://localhost:4566"
+    $env:SQS_ENDPOINT_URL = "http://localhost:4566"
+    $env:S3_RESULT_BUCKET = "dpp-results-test"
+    $env:SQS_QUEUE_URL = "http://localhost:4566/000000000000/dpp-runs"
+
     # Step 5: Construct pytest command
     Write-Host "[5/6] Constructing pytest command..." -ForegroundColor Yellow
     $PytestArgs = @("-q", "-o", "addopts=", "--maxfail=1") + $RcTests
@@ -161,7 +190,12 @@ $(docker compose -f "$RepoRoot\infra\docker-compose.yml" ps 2>&1)
     Pop-Location
 
     # Display output
-    Get-Content $StdoutFile | Write-Host
+    if (Test-Path $StdoutFile) {
+        Get-Content $StdoutFile | Write-Host
+    } else {
+        Write-Host "ERROR: rc_run_stdout.log not found!" -ForegroundColor Red
+    }
+
     if (Test-Path $StderrFile) {
         $StderrContent = Get-Content $StderrFile -Raw
         if ($StderrContent.Trim().Length -gt 0) {

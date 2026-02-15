@@ -176,19 +176,20 @@ async def rate_limit_middleware(request: Request, call_next):
     # Process request normally
     response = await call_next(request)
 
-    # P0-4: Add RateLimit headers to successful responses
-    # ONLY if handler did NOT already set them
+    # P1-C: Add RateLimit headers to successful responses
+    # Preserve handler-set headers, but fill missing ones
     if 200 <= response.status_code < 300:
         # Check if handler already set RateLimit headers
         handler_set_policy = "RateLimit-Policy" in response.headers
         handler_set_limit = "RateLimit" in response.headers
 
-        # Only add default headers if not already present
-        if not handler_set_policy and not handler_set_limit:
+        # Fill missing headers (preserve handler-set values)
+        if not handler_set_policy:
             rate_limit_policy = f'"{result.policy_id}"; q={result.quota}; w={result.window}'
-            rate_limit = f'"{result.policy_id}"; r={result.remaining}; t={result.reset}'
-
             response.headers["RateLimit-Policy"] = rate_limit_policy
+
+        if not handler_set_limit:
+            rate_limit = f'"{result.policy_id}"; r={result.remaining}; t={result.reset}'
             response.headers["RateLimit"] = rate_limit
 
     return response
