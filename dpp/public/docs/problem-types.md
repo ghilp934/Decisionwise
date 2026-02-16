@@ -36,7 +36,7 @@ Decisionproof adds extension fields for specific problem types:
 
 **Type**: `https://iana.org/assignments/http-problem-types#quota-exceeded`
 
-**When**: RPM limit, monthly DC quota, or hard overage cap exceeded.
+**When**: RPM limit, monthly budget quota, or hard overage cap exceeded.
 
 **Client Action**: Wait for `Retry-After` seconds (check `violated-policies` to identify which limit). Upgrade tier if frequently hitting limits.
 
@@ -50,7 +50,7 @@ Decisionproof adds extension fields for specific problem types:
 
 **When**: Workspace budget cap exceeded (configurable hard spending limit).
 
-**Client Action**: Add credits to workspace or increase budget cap. Contact billing support.
+**Client Action**: Increase budget allocation or increase budget cap. Contact billing support.
 
 ---
 
@@ -68,9 +68,9 @@ Decisionproof adds extension fields for specific problem types:
 
 **Type**: `https://iana.org/assignments/http-problem-types#unauthorized`
 
-**When**: Missing or invalid API key.
+**When**: Missing or invalid Bearer token.
 
-**Client Action**: Verify API key is correct and included in `X-API-Key` header.
+**Client Action**: Verify `Authorization` header is present with format: `Bearer sk_{key_id}_{secret}`. Check token is not expired.
 
 ---
 
