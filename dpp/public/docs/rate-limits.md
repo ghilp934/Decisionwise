@@ -37,9 +37,9 @@ When you exceed the rate limit, you receive a 429 response:
 ```http
 HTTP/1.1 429 Too Many Requests
 Content-Type: application/problem+json
-RateLimit-Policy: rpm;w=60
-RateLimit: limit=600, remaining=0, reset=30
-Retry-After: 30
+RateLimit-Policy: "default"; q=60; w=60
+RateLimit: limit=600, remaining=0, reset=60
+Retry-After: 60
 ```
 
 ```json
