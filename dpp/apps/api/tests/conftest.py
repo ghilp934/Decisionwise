@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from dpp_api.budget.redis_scripts import BudgetScripts
+from dpp_api.db.engine import build_engine
 from dpp_api.db.models import APIKey, Base, Plan, Tenant
 from dpp_api.db.redis_client import RedisClient
 from dpp_api.db.repo_api_keys import APIKeyRepository
@@ -80,12 +81,12 @@ def db_session() -> Session:
 
     Uses PostgreSQL if DATABASE_URL is set, otherwise in-memory SQLite.
     """
-    # Create engine
+    # Create engine (using SSOT builder for PostgreSQL, StaticPool for SQLite)
     if "postgresql" in TEST_DATABASE_URL:
-        # PostgreSQL: use normal connection
-        engine = create_engine(TEST_DATABASE_URL)
+        # PostgreSQL: use SSOT engine builder (respects NullPool policy)
+        engine = build_engine(TEST_DATABASE_URL)
     else:
-        # SQLite: use in-memory with special settings
+        # SQLite: use in-memory with special settings (StaticPool required for :memory:)
         engine = create_engine(
             TEST_DATABASE_URL,
             connect_args={"check_same_thread": False},

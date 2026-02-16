@@ -235,7 +235,9 @@ allowed_origins = [
 ```
 
 ### Secrets Management
-- **Database**: `DATABASE_URL` environment variable
+- **Database**: `DATABASE_URL` environment variable (Supabase pooler recommended, see [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md))
+  - `DATABASE_URL_MIGRATIONS` (optional, Alembic-specific)
+  - ⚠️ **NEVER commit actual passwords/keys to version control**
 - **Redis**: `REDIS_PASSWORD` environment variable
 - **AWS**: IAM roles (no hardcoded credentials)
 - **Production**: AWS Secrets Manager / Kubernetes Secrets

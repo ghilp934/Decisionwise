@@ -18,13 +18,13 @@ import os
 import threading
 from pathlib import Path
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 # P0-2: Removed sys.path manipulation - PYTHONPATH handles this in Dockerfile
 # Container images include dpp_api via COPY and ENV PYTHONPATH
 
 from dpp_api.budget import BudgetManager
+from dpp_api.db.engine import build_engine, build_sessionmaker
 from dpp_api.db.redis_client import RedisClient
 from dpp_api.utils import configure_json_logging
 from dpp_reaper.loops.reaper_loop import reaper_loop
@@ -64,9 +64,9 @@ def main() -> None:
     reconcile_threshold_min = int(os.getenv("RECONCILE_THRESHOLD_MIN", "5"))
     reconcile_scan_limit = int(os.getenv("RECONCILE_SCAN_LIMIT", "100"))
 
-    # Database engine (shared)
-    engine = create_engine(database_url, echo=False)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    # Database engine (shared, using SSOT engine builder)
+    engine = build_engine(database_url)
+    SessionLocal = build_sessionmaker(engine)
 
     # Create separate sessions for each loop (SQLAlchemy sessions are NOT thread-safe)
     reaper_session = SessionLocal()

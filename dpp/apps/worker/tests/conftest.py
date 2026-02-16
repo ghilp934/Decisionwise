@@ -14,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "api"))
 
 from dpp_api.budget import BudgetManager
+from dpp_api.db.engine import build_engine
 from dpp_api.db.models import Base
 
 # Use PostgreSQL for tests (BIGINT autoincrement requires PostgreSQL)
@@ -32,12 +33,12 @@ def db_session() -> Session:
 
     Uses PostgreSQL if DATABASE_URL is set, otherwise in-memory SQLite.
     """
-    # Create engine
+    # Create engine (using SSOT builder for PostgreSQL, StaticPool for SQLite)
     if "postgresql" in TEST_DATABASE_URL:
-        # PostgreSQL: use normal connection
-        engine = create_engine(TEST_DATABASE_URL)
+        # PostgreSQL: use SSOT engine builder (respects NullPool policy)
+        engine = build_engine(TEST_DATABASE_URL)
     else:
-        # SQLite: use in-memory with special settings
+        # SQLite: use in-memory with special settings (StaticPool required for :memory:)
         engine = create_engine(
             TEST_DATABASE_URL,
             connect_args={"check_same_thread": False},

@@ -1,26 +1,19 @@
-"""Database session management."""
+"""Database session management.
 
-import os
+Spec Lock: Uses unified engine builder (SSOT) with NullPool default.
+"""
+
 from typing import Generator
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
-# ENV-01: Database URL from environment with fallback to docker-compose default
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://dpp_user:dpp_pass@localhost:5432/dpp"
-)
+from dpp_api.db.engine import build_engine, build_sessionmaker
 
-# Create engine
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,  # Verify connections before using
-    pool_size=5,
-    max_overflow=10,
-)
+# Create engine using SSOT builder (default: NullPool)
+engine = build_engine()
 
 # Create session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = build_sessionmaker(engine)
 
 
 def get_db() -> Generator[Session, None, None]:

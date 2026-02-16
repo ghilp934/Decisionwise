@@ -1,15 +1,15 @@
-"""Alembic environment configuration."""
+"""Alembic environment configuration.
 
+Spec Lock: URL injection from environment (DATABASE_URL_MIGRATIONS -> DATABASE_URL).
+"""
+
+import os
+import sys
 from logging.config import fileConfig
-
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from pathlib import Path
 
 from alembic import context
-
-# Import your models' Base here
-import sys
-from pathlib import Path
+from sqlalchemy import engine_from_config, pool
 
 # Add apps/api to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "api"))
@@ -29,10 +29,23 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 target_metadata = Base.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# Spec Lock: Inject DATABASE_URL from environment
+# Priority: DATABASE_URL_MIGRATIONS (migration-specific) > DATABASE_URL (runtime) > alembic.ini
+database_url = (
+    os.getenv("DATABASE_URL_MIGRATIONS")
+    or os.getenv("DATABASE_URL")
+    or config.get_main_option("sqlalchemy.url")
+)
+
+if not database_url:
+    raise ValueError(
+        "Database URL not configured. "
+        "Set DATABASE_URL_MIGRATIONS or DATABASE_URL environment variable, "
+        "or configure sqlalchemy.url in alembic.ini."
+    )
+
+# Inject URL into config for engine_from_config()
+config.set_main_option("sqlalchemy.url", database_url)
 
 
 def run_migrations_offline() -> None:
