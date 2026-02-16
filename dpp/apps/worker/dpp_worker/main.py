@@ -5,13 +5,13 @@ import os
 from pathlib import Path
 
 import boto3
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 # P0-2: Removed sys.path manipulation - PYTHONPATH handles this in Dockerfile
 # Container images include dpp_api via COPY and ENV PYTHONPATH
 
 from dpp_api.budget import BudgetManager
+from dpp_api.db.engine import build_engine, build_sessionmaker
 from dpp_api.db.redis_client import RedisClient
 from dpp_api.utils import configure_json_logging
 from dpp_worker.loops.sqs_loop import WorkerLoop
@@ -108,9 +108,9 @@ def main() -> None:
 
     s3_client = boto3.client("s3", **s3_kwargs)
 
-    # Database
-    engine = create_engine(database_url, echo=False)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    # Database (using SSOT engine builder)
+    engine = build_engine(database_url)
+    SessionLocal = build_sessionmaker(engine)
     db_session = SessionLocal()
 
     # Redis

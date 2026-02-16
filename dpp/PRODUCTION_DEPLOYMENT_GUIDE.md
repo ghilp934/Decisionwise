@@ -81,6 +81,25 @@
 ### External Services
 
 #### PostgreSQL Database
+
+##### Supabase (Recommended SSOT)
+Decisionproof uses Supabase Postgres as the primary database. Connection strings must be copied from Supabase Dashboard → Connect panel (do not manually construct).
+
+**Recommended Connection Modes:**
+- **Runtime** (API/Worker/Reaper): Pooler "Transaction mode" (port **6543**) [Supabase Pooler Documentation](https://supabase.com/docs/guides/database/connecting-to-postgres#connection-pooler)
+- **Migrations** (Alembic): Pooler "Session mode" (port **5432**, optional) [Alembic Migration Guide](https://supabase.com/docs/guides/database/connecting-to-postgres#migration-tools)
+- **Direct connection**: Port 5432 (may have IPv6 constraints, pooler recommended) [Network Configuration](https://supabase.com/docs/guides/platform/network-restrictions)
+
+**SQLAlchemy Pool Policy (Spec Lock):**
+- Default: **NullPool** (client-side pooling disabled)
+- Rationale: Supabase pooler (transaction mode) handles connection pooling [Connection Pooling Best Practices](https://supabase.com/docs/guides/database/connecting-to-postgres#pooler-connection-pooling)
+
+**Environment Variables:**
+- `DATABASE_URL`: Runtime connection string (transaction mode, port 6543)
+- `DATABASE_URL_MIGRATIONS`: Alembic-specific (session mode, port 5432, optional)
+- `DPP_DB_POOL`: Pool mode (`nullpool` default | `queuepool` for special cases)
+
+##### Self-Hosted PostgreSQL (Alternative)
 - **Version**: 15+
 - **Instance Class**: db.r6g.xlarge (or equivalent)
 - **Storage**: 100 GB SSD (auto-scaling enabled)
@@ -121,8 +140,19 @@
 LOG_LEVEL=INFO
 DPP_JSON_LOGS=true
 
-# Database
-DATABASE_URL=postgresql://dpp_user:${DB_PASSWORD}@prod-db.example.com:5432/dpp
+# Database (Supabase SSOT)
+# IMPORTANT: Copy connection string from Supabase Dashboard → Connect → Transaction mode
+# Format: postgres://[db-user].[project-ref]:[db-password]@aws-0-[region].pooler.supabase.com:6543/postgres
+# NEVER commit actual passwords/keys
+DATABASE_URL=postgres://[db-user].[project-ref]:[db-password]@aws-0-[region].pooler.supabase.com:6543/postgres
+
+# Database (Migrations - Optional, Session mode recommended)
+# DATABASE_URL_MIGRATIONS=postgres://[db-user].[project-ref]:[db-password]@aws-0-[region].pooler.supabase.com:5432/postgres
+
+# Database Pool Policy (Spec Lock: NullPool default)
+# DPP_DB_POOL=nullpool  # default (recommended for Supabase pooler)
+# DPP_DB_POOL_SIZE=5    # only for queuepool mode
+# DPP_DB_MAX_OVERFLOW=10  # only for queuepool mode
 
 # Redis
 REDIS_URL=redis://prod-redis.example.com:6379/0

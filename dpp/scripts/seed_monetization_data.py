@@ -14,19 +14,19 @@ import uuid
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../apps/api"))
 
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 
-from dpp_api.db.models import APIKey, Plan, Tenant, TenantPlan
 from dpp_api.auth.api_key import hash_api_key
+from dpp_api.db.engine import build_engine, build_sessionmaker
+from dpp_api.db.models import APIKey, Plan, Tenant, TenantPlan
 
-# Database connection
+# Database connection (using SSOT engine builder)
 DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql://dpp_user:dpp_pass@localhost:5432/dpp"
 )
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(bind=engine)
+engine = build_engine(DATABASE_URL)
+SessionLocal = build_sessionmaker(engine)
 
 
 def seed_data():
