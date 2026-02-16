@@ -2,19 +2,20 @@
 
 Decisionproof implements IETF draft-ietf-httpapi-ratelimit-headers compliant rate limiting.
 
-## RateLimit Headers
+## RateLimit Headers (SSOT - Single Source of Truth)
 
-All responses include RateLimit headers:
+All responses include RateLimit headers per IETF draft-ietf-httpapi-ratelimit-headers:
 
 ### RateLimit-Policy
 
 Describes the rate limit policy applied to this request.
 
 ```http
-RateLimit-Policy: rpm;w=60
+RateLimit-Policy: "default"; q=60; w=60
 ```
 
-- `rpm`: Policy name (requests per minute)
+- `"default"`: Policy identifier
+- `q=60`: Quota (requests allowed per window)
 - `w=60`: Window size in seconds
 
 ### RateLimit
