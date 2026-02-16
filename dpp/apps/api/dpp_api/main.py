@@ -591,7 +591,7 @@ def custom_openapi():
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "opaque-token",
-        "description": "Bearer token in format: sk_{environment}_{key_id}_{secret} (e.g., sk_live_abc123_xyz789...)",
+        "description": "Bearer token authentication. Format: sk_{key_id}_{secret} (e.g., sk_abc123_xyz789def456...). Include Idempotency-Key header for duplicate prevention.",
     }
 
     # Apply security globally
@@ -668,91 +668,102 @@ async def function_calling_specs():
     """
     Function Calling Specifications for AI/Agent integration.
 
-    MTS-3.0-DOC v0.2: Machine-readable tool specifications with examples.
+    Auto-generated from RunCreateRequest Pydantic model (SSOT).
     Returns: Function calling specs JSON with tools, parameters, and examples.
     """
     from datetime import datetime, timezone
+    from .schemas import RunCreateRequest
 
     # Derive base URL from environment or default
     base_url = os.getenv("API_BASE_URL", "https://api.decisionproof.ai")
 
+    # Generate schema from Pydantic model (SSOT)
+    run_create_schema = RunCreateRequest.model_json_schema()
+
     spec = {
-        "spec_version": "2026-02-14.v0.2.0",
+        "spec_version": "2026-02-17.v0.3.0",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "base_url": base_url,
         "auth": {
             "type": "http",
             "scheme": "bearer",
             "bearer_format": "opaque-token",
-            "format": "sk_{environment}_{key_id}_{secret} (e.g., sk_live_*, sk_test_*)",
+            "description": "Bearer token authentication. Format: sk_{key_id}_{secret} (e.g., sk_abc123_xyz789def456...). Include Idempotency-Key header for duplicate prevention.",
+            "headers": {
+                "Authorization": "Bearer sk_{key_id}_{secret}",
+                "Idempotency-Key": "unique-request-id (UUID recommended)"
+            },
             "docs": f"{base_url}/docs/auth.md",
         },
         "tools": [
             {
                 "name": "create_decision_run",
-                "description": "Submit a decision run for asynchronous execution",
+                "description": "Submit a run for asynchronous execution (202 Accepted). Returns run_id for polling.",
                 "endpoint": "/v1/runs",
                 "method": "POST",
-                "parameters": {
-                    "type": "object",
-                    "required": ["workspace_id", "run_id", "plan_id", "input"],
-                    "properties": {
-                        "workspace_id": {
-                            "type": "string",
-                            "description": "Workspace identifier",
-                            "pattern": "^ws_[a-zA-Z0-9]+$",
-                        },
-                        "run_id": {
-                            "type": "string",
-                            "description": "Unique idempotency key (45-day retention)",
-                            "pattern": "^run_[a-zA-Z0-9_-]+$",
-                        },
-                        "plan_id": {
-                            "type": "string",
-                            "description": "Decision plan identifier",
-                            "pattern": "^plan_[a-zA-Z0-9]+$",
-                        },
-                        "input": {
-                            "type": "object",
-                            "description": "Input data for decision execution",
-                        },
-                    },
+                "parameters": run_create_schema,
+                "response": {
+                    "status": 202,
+                    "description": "Run accepted and queued for execution",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "run_id": {"type": "string", "description": "Server-generated run identifier"},
+                            "status": {"type": "string", "enum": ["queued"], "description": "Initial status"},
+                            "poll": {
+                                "type": "object",
+                                "properties": {
+                                    "href": {"type": "string", "description": "Polling endpoint path"},
+                                    "recommended_interval_ms": {"type": "integer", "description": "Recommended polling interval (milliseconds)"},
+                                    "max_wait_sec": {"type": "integer", "description": "Maximum execution timeout (seconds)"}
+                                }
+                            }
+                        }
+                    }
                 },
                 "examples": [
                     {
                         "description": "Simple decision request",
                         "request": {
-                            "workspace_id": "ws_abc123",
-                            "run_id": "run_unique_001",
-                            "plan_id": "plan_xyz789",
-                            "input": {"question": "What is the capital of France?"},
+                            "pack_type": "decision",
+                            "inputs": {"question": "Should we proceed with Plan A?"},
+                            "reservation": {
+                                "max_cost_usd": "0.0500",
+                                "timebox_sec": 90,
+                                "min_reliability_score": 0.8
+                            }
                         },
                         "response": {
                             "status": 202,
                             "body": {
-                                "run_id": "run_unique_001",
+                                "run_id": "run_abc123def456",
                                 "status": "queued",
-                                "poll_url": "/v1/runs/run_unique_001",
+                                "poll": {
+                                    "href": "/v1/runs/run_abc123def456",
+                                    "recommended_interval_ms": 1500,
+                                    "max_wait_sec": 90
+                                }
                             },
                         },
                     },
                     {
-                        "description": "Complex decision with structured input",
+                        "description": "URL pack with custom metadata",
                         "request": {
-                            "workspace_id": "ws_abc123",
-                            "run_id": "run_unique_002",
-                            "plan_id": "plan_analysis",
-                            "input": {
-                                "data": [1, 2, 3, 4, 5],
-                                "operation": "statistical_summary",
-                            },
+                            "pack_type": "url",
+                            "inputs": {"url": "https://example.com/page"},
+                            "reservation": {"max_cost_usd": "0.0100"},
+                            "meta": {"trace_id": "trace-abc-123"}
                         },
                         "response": {
                             "status": 202,
                             "body": {
-                                "run_id": "run_unique_002",
+                                "run_id": "run_xyz789ghi012",
                                 "status": "queued",
-                                "poll_url": "/v1/runs/run_unique_002",
+                                "poll": {
+                                    "href": "/v1/runs/run_xyz789ghi012",
+                                    "recommended_interval_ms": 1500,
+                                    "max_wait_sec": 90
+                                }
                             },
                         },
                     },
@@ -760,7 +771,7 @@ async def function_calling_specs():
             },
             {
                 "name": "get_run_status",
-                "description": "Poll run execution status",
+                "description": "Poll run execution status until completed or failed",
                 "endpoint": "/v1/runs/{run_id}",
                 "method": "GET",
                 "parameters": {

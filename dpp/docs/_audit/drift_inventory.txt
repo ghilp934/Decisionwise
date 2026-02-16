@@ -1,0 +1,70 @@
+================================================================================
+DRIFT INVENTORY - Forbidden Token Scan
+Date: 2026-02-17 04:01:53
+Project: Decisionwise API Platform (Decisionproof)
+================================================================================
+
+## Scanning for: X-API-Key
+
+### Found in: public\docs\auth-delegated.md
+  Line 174: **Note**: API Key authentication (`X-API-Key` header) remains supported for backward compatibility.
+
+### Found in: public\docs\auth.md
+  Line 129: 1. Check header name: Must be `Authorization` (not `X-API-Key`)
+
+## Scanning for: dw_live_
+
+### Found in: public\docs\human-escalation-template.md
+  Line 29: - Keys use format: `dw_live_*` (production) or `dw_test_*` (sandbox)
+
+## Scanning for: dw_test_
+
+### Found in: public\docs\human-escalation-template.md
+  Line 29: - Keys use format: `dw_live_*` (production) or `dw_test_*` (sandbox)
+
+## Scanning for: sk_live_
+
+✓ No occurrences found
+
+## Scanning for: sk_test_
+
+✓ No occurrences found
+
+## Scanning for: workspace_id
+
+### Found in: apps\api\dpp_api\main.py
+  Line 490:                 "workspace_id": "ws_abc123",
+
+### Found in: public\docs\auth-delegated.md
+  Line 167:     "workspace_id": "ws_abc123",
+
+### Found in: public\docs\pilot-pack-v0.2.md
+  Line 88: idempotency_key = f"idempotency:{workspace_id}:{run_id}"
+  Line 228: - Same (workspace_id, run_id) within D+7 → deduplication_status: "duplicate" (non-billable)
+  Line 229: - Same (workspace_id, run_id) after D+7 → deduplication_status: "original" (billable again)
+
+### Found in: public\docs\pricing-ssot.md
+  Line 129: - **Idempotency scope**: (workspace_id, run_id)
+
+## Scanning for: plan_id
+
+### Found in: apps\api\dpp_api\main.py
+  Line 492:                 "plan_id": "plan_xyz789",
+
+### Found in: public\docs\auth-delegated.md
+  Line 169:     "plan_id": "plan_xyz789",
+
+## Scanning for: Decision Credits
+
+### Found in: docs\pilot\04_BILLING_AND_REFUND.md
+  Line 24: - 포함 크레딧: 1,000 DC (Decision Credits)
+
+### Found in: public\docs\human-escalation-template.md
+  Line 75: - **Included Decision Credits**: [DC_AMOUNT] DC (based on tier)
+
+### Found in: public\docs\pricing-ssot.md
+  Line 48: - **included_dc_per_month**: Included Decision Credits (DC) per month
+
+================================================================================
+SCAN COMPLETE - Total findings: 15
+================================================================================

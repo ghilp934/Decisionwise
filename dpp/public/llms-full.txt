@@ -11,36 +11,35 @@
   Machine-readable function calling specifications for AI agents. Includes tool parameters (JSON Schema), examples, and authentication requirements.
 
 - **Quickstart**: /docs/quickstart.md
-  cURL/Python/Node.js examples for 200/422/429 responses, authentication headers, and idempotency rules. Runnable code snippets.
+  cURL/Python/Node.js examples for asynchronous runs (202 + polling), authentication headers, and idempotency rules. Runnable code snippets.
 
 - **Authentication**: /docs/auth.md
-  API Key authentication (X-API-Key header). 401/403 responses are non-billable.
+  Bearer token authentication (`Authorization: Bearer sk_{key_id}_{secret}`). 401/403 responses are non-billable.
 
 - **Delegated Authentication**: /docs/auth-delegated.md
   OAuth 2.0 (RFC 6749) flows: Authorization Code, Client Credentials. Device Authorization Grant (RFC 8628) for headless agents and CLI tools. Roadmap: Q2-Q3 2026.
 
 - **Rate Limits**: /docs/rate-limits.md
-  IETF draft-ietf-httpapi-ratelimit-headers compliant. RateLimit-Policy and RateLimit headers on all responses. Retry-After on 429.
+  IETF draft-ietf-httpapi-ratelimit-headers compliant. RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset headers on all responses. Retry-After on 429.
 
 - **Problem Types (RFC 9457)**: /docs/problem-types.md
   application/problem+json responses for errors. quota-exceeded, budget-exceeded, invalid-request, unauthorized, forbidden types.
 
 - **Metering & Billing**: /docs/metering-billing.md
-  Billable: 2xx + 422 only. Non-billable: 400/401/403/404/409/412/413/415/429/5xx. Idempotency prevents duplicate charges.
-
-- **Pricing SSoT**: /docs/pricing-ssot.md | /pricing/ssot.json
-  Canonical pricing configuration (v0.2.1). Tier limits, DC quotas, overage caps, RPM limits. Machine-readable JSON.
+  Charges in USD (4 decimal places). Billable: successful execution + business logic failures. Non-billable: authentication/validation errors. Idempotency prevents duplicate charges.
 
 - **Human Escalation Templates**: /docs/human-escalation-template.md
-  Pre-formatted templates for AI agents to request human approval. Template A: API key/workspace access. Template B: Monthly budget cap increase. Template C: Rate limit tier upgrade.
+  Pre-formatted templates for AI agents to request human approval. Template A: API token access. Template B: Budget increase. Template C: Rate limit tier upgrade.
 
 - **Changelog**: /docs/changelog.md
   Document version history with breaking change markers.
 
 ## Agent Integration Hints
 
-- **Auth Header**: `X-API-Key: dw_live_xxx` (or dw_test_xxx for sandbox)
-- **Idempotency**: Include unique `run_id` in request body. Same (workspace_id, run_id) charged only once (45-day retention).
-- **Billability**: Only 2xx and 422 responses are billable. All errors (400/401/403/404/429/5xx) are non-billable.
-- **429 Handling**: Check `violated-policies` array in Problem Details. Respect `Retry-After` header (seconds). Exponential backoff recommended.
-- **RateLimit Headers**: Parse `RateLimit-Policy` and `RateLimit` headers. Format: `limit, remaining, reset` per IETF draft.
+- **Auth Header**: `Authorization: Bearer sk_{key_id}_{secret}`
+- **Idempotency**: Include `Idempotency-Key` header (UUID recommended). Same key within 7 days returns existing run_id (no charge).
+- **Async Pattern**: POST /v1/runs returns 202 Accepted with run_id. Poll GET /v1/runs/{run_id} until status is "completed" or "failed".
+- **Billability**: Charges apply for successful execution and business logic failures. Authentication/validation errors (401/422/429) are non-billable.
+- **429 Handling**: Check `reason_code` in Problem Details. Respect `Retry-After` header (seconds). Exponential backoff recommended.
+- **RateLimit Headers**: Parse `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` headers (IETF standard format).
+- **Cost Tracking**: Every response includes `cost` object with `reserved_usd`, `used_usd`, `budget_remaining_usd`.

@@ -1,60 +1,13 @@
-# Authentication
+# DO NOT EDIT - See Canonical Version
 
-## API Key Authentication
+WARNING: This is a stub file. DO NOT edit this copy.
 
-Decisionproof uses API keys for authentication. Include your API key in the `X-API-Key` header:
+Canonical version (SSOT): public/docs/auth.md
 
-```http
-X-API-Key: dw_live_abc123...
-```
+All documentation edits MUST be made in public/docs/ which is served at /docs endpoints.
 
-### Key Formats
+This stub exists to prevent confusion and accidental edits to outdated copies.
 
-- **Live keys**: `dw_live_*` (production)
-- **Test keys**: `dw_test_*` (sandbox)
+---
 
-### Example Request
-
-```bash
-curl -X GET https://api.decisionproof.ai/v1/health \
-  -H "X-API-Key: dw_live_abc123..."
-```
-
-## Error Responses
-
-### 401 Unauthorized
-
-API key is missing or invalid.
-
-```json
-{
-  "type": "https://iana.org/assignments/http-problem-types#unauthorized",
-  "title": "Unauthorized",
-  "status": 401,
-  "detail": "Invalid or missing API key"
-}
-```
-
-**Billable**: No (non-billable per billing rules)
-
-### 403 Forbidden
-
-API key is valid but lacks permissions for the requested resource.
-
-```json
-{
-  "type": "https://iana.org/assignments/http-problem-types#forbidden",
-  "title": "Forbidden",
-  "status": 403,
-  "detail": "API key does not have permission to access this resource"
-}
-```
-
-**Billable**: No (non-billable per billing rules)
-
-## Security Best Practices
-
-- Never commit API keys to version control
-- Rotate keys regularly
-- Use test keys for development/testing
-- Restrict API keys to specific IP addresses (contact support)
+For the actual content, see: public/docs/auth.md
