@@ -277,6 +277,37 @@ class S3Client:
             )
             raise
 
+    def delete_object(self, bucket: str, key: str) -> bool:
+        """Delete S3 object (P0-6: Retention Cleanup).
+
+        Args:
+            bucket: S3 bucket name
+            key: S3 object key
+
+        Returns:
+            True if object was deleted or didn't exist, False on error
+
+        Raises:
+            ClientError: If deletion fails (except 404)
+        """
+        try:
+            self.client.delete_object(Bucket=bucket, Key=key)
+            logger.info(f"Deleted S3 object: s3://{bucket}/{key}")
+            return True
+
+        except ClientError as e:
+            # 404 is OK (object already deleted)
+            if e.response["Error"]["Code"] == "404":
+                logger.warning(f"S3 object not found (already deleted): s3://{bucket}/{key}")
+                return True
+
+            # Other errors should be logged and raised
+            logger.error(
+                f"Failed to delete S3 object s3://{bucket}/{key}: {e}",
+                exc_info=True,
+            )
+            raise
+
 
 # Singleton instance
 _s3_client: Optional[S3Client] = None

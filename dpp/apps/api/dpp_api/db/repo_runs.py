@@ -258,3 +258,58 @@ class RunRepository:
 
         logger.info(f"force_update_claimed_only succeeded for run {run_id}")
         return True
+
+    def find_expired_runs(self, cutoff_days: int, limit: int = 100) -> list[Run]:
+        """Find runs with completed results older than cutoff_days (P0-6: Retention Cleanup).
+
+        Args:
+            cutoff_days: Number of days after completion to consider expired
+            limit: Maximum number of runs to return
+
+        Returns:
+            List of runs with completed results older than cutoff_days
+        """
+        from datetime import timedelta
+
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=cutoff_days)
+
+        stmt = (
+            select(Run)
+            .where(
+                Run.status == "COMPLETED",
+                Run.completed_at < cutoff_date,
+                Run.result_s3_key.isnot(None),  # Has S3 result
+                Run.result_cleared_at.is_(None),  # Not yet cleared
+            )
+            .limit(limit)
+        )
+
+        return list(self.db.execute(stmt).scalars().all())
+
+    def mark_results_cleared(self, run_ids: list[str]) -> int:
+        """Mark runs as result cleared (P0-6: Retention Cleanup).
+
+        Args:
+            run_ids: List of run IDs to mark as cleared
+
+        Returns:
+            Number of runs updated
+        """
+        if not run_ids:
+            return 0
+
+        stmt = (
+            update(Run)
+            .where(Run.run_id.in_(run_ids))
+            .values(
+                result_cleared_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+        )
+
+        result = self.db.execute(stmt)
+        self.db.commit()
+
+        logger.info(f"Marked {result.rowcount} runs as result cleared")
+        return result.rowcount
+        return True
