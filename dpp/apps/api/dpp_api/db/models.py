@@ -35,7 +35,7 @@ class APIKey(Base):
 
     key_id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(
-        TEXT, nullable=False, index=True
+        TEXT, nullable=False
     )  # FK to tenants
     key_hash: Mapped[str] = mapped_column(TEXT, nullable=False)
     label: Mapped[Optional[str]] = mapped_column(TEXT, nullable=True)
@@ -59,7 +59,7 @@ class Run(Base):
 
     run_id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(
-        TEXT, nullable=False, index=True
+        TEXT, nullable=False
     )  # FK to tenants
 
     pack_type: Mapped[str] = mapped_column(TEXT, nullable=False)
@@ -135,8 +135,8 @@ class Run(Base):
     __table_args__ = (
         Index("idx_runs_tenant_created", "tenant_id", "created_at"),
         Index("idx_runs_status_lease", "status", "lease_expires_at"),
-        Index("idx_runs_idem", "tenant_id", "idempotency_key"),
         # P0-B: Prevent duplicate idempotency_key per tenant (INT-01, DEC-4201)
+        # Note: UniqueConstraint already creates an index, so idx_runs_idem is redundant
         UniqueConstraint("tenant_id", "idempotency_key", name="uq_runs_tenant_idempotency"),
     )
 
@@ -191,7 +191,7 @@ class TenantPlan(Base):
 
     # P0-A: Use BIGINT for autoincrement IDs (production scale)
     id: Mapped[int] = mapped_column(BIGINT, primary_key=True, autoincrement=True)
-    tenant_id: Mapped[str] = mapped_column(TEXT, nullable=False, index=True)
+    tenant_id: Mapped[str] = mapped_column(TEXT, nullable=False)
     plan_id: Mapped[str] = mapped_column(TEXT, nullable=False)
 
     status: Mapped[str] = mapped_column(TEXT, nullable=False, default="ACTIVE")
@@ -232,7 +232,7 @@ class TenantUsageDaily(Base):
 
     # P0-A: Use BIGINT for autoincrement IDs (production scale)
     id: Mapped[int] = mapped_column(BIGINT, primary_key=True, autoincrement=True)
-    tenant_id: Mapped[str] = mapped_column(TEXT, nullable=False, index=True)
+    tenant_id: Mapped[str] = mapped_column(TEXT, nullable=False)
     usage_date: Mapped[date] = mapped_column(DATE, nullable=False)
 
     # Counts

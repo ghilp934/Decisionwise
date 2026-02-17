@@ -27,14 +27,24 @@ def main() -> None:
     Path("/tmp/worker-ready").unlink(missing_ok=True)
 
     # ENV-01: Configuration from environment with fail-fast
+    dp_env = os.getenv("DP_ENV", "").lower()
     database_url = os.getenv("DATABASE_URL")
-    if not database_url:
-        # Default to docker-compose configuration (ENV-01: unified to 'dpp')
-        database_url = "postgresql://dpp_user:dpp_pass@localhost:5432/dpp"
-        logger.warning(
-            "DATABASE_URL not set, using default: %s",
-            database_url.replace("dpp_pass", "***"),
-        )
+
+    if dp_env in {"prod", "production"}:
+        # Production: DATABASE_URL is required (fail-fast)
+        if not database_url:
+            raise RuntimeError(
+                "DATABASE_URL environment variable is required in production (DP_ENV=prod/production). "
+                "Check deployment configuration and secrets injection."
+            )
+        logger.info("DATABASE_URL: set (production mode)")
+    else:
+        # Development/CI: fallback to docker-compose default
+        if not database_url:
+            database_url = "postgresql://dpp_user:dpp_pass@localhost:5432/dpp"
+            logger.info("DATABASE_URL: unset, using docker-compose default")
+        else:
+            logger.info("DATABASE_URL: set")
 
     # P0-A: NO DEFAULTS for production safety
     sqs_queue_url = os.getenv("SQS_QUEUE_URL")
