@@ -95,9 +95,23 @@ Decisionproof uses Supabase Postgres as the primary database. Connection strings
 - Rationale: Supabase pooler (transaction mode) handles connection pooling [Connection Pooling Best Practices](https://supabase.com/docs/guides/database/connecting-to-postgres#pooler-connection-pooling)
 
 **Environment Variables:**
-- `DATABASE_URL`: Runtime connection string (transaction mode, port 6543)
+- `DATABASE_URL`: Runtime connection string (transaction mode, port 6543) - **Required in production** (DP_ENV=prod/production)
 - `DATABASE_URL_MIGRATIONS`: Alembic-specific (session mode, port 5432, optional)
 - `DPP_DB_POOL`: Pool mode (`nullpool` default | `queuepool` for special cases)
+- `DP_ENV`: Environment mode (`prod`|`production` triggers fail-fast on missing DATABASE_URL)
+
+**Row Level Security (RLS):**
+- RLS is **enabled by default** on all public tables: `tenants`, `api_keys`, `runs`, `plans`, `tenant_plans`, `tenant_usage_daily`
+- Default policy: **DENY** (no permissive policies added intentionally)
+- Server-side connections (owner role) bypass RLS automatically (not FORCE RLS)
+- Defense-in-depth: Protects against Supabase anon/authenticated role access
+
+**Secrets Management:**
+- **운영 비밀값은 Git에 두지 않습니다** (NEVER commit actual passwords/keys to version control)
+- **AWS Secrets Manager/SSM 권장**: Production secrets injected via environment variables
+- **Supabase Vault (Optional)**: For DB-internal secrets, use `vault.secrets` / `vault.decrypted_secrets` [Supabase Vault Documentation](https://supabase.com/docs/guides/database/vault)
+  - Access: Server-side only (service role)
+  - Use case: API keys stored in DB, encrypted at rest
 
 ##### Self-Hosted PostgreSQL (Alternative)
 - **Version**: 15+

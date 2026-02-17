@@ -235,9 +235,20 @@ allowed_origins = [
 ```
 
 ### Secrets Management
-- **Database**: `DATABASE_URL` environment variable (Supabase pooler recommended, see [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md))
-  - `DATABASE_URL_MIGRATIONS` (optional, Alembic-specific)
+
+#### Database (Supabase SSOT)
+- **Connection**: `DATABASE_URL` environment variable
+  - Supabase Pooler Transaction mode (port 6543) for runtime [Details](PRODUCTION_DEPLOYMENT_GUIDE.md#supabase-recommended-ssot)
+  - SQLAlchemy **NullPool** (default, Spec Lock) - no client-side pooling
+  - `DP_ENV=prod/production` enforces DATABASE_URL presence (fail-fast)
+- **Migrations**: `DATABASE_URL_MIGRATIONS` (optional, Session mode port 5432)
+- **Row Level Security (RLS)**: Enabled by default on all public tables (defense-in-depth, default deny)
+- **Secrets Storage**:
   - ⚠️ **NEVER commit actual passwords/keys to version control**
+  - Production: AWS Secrets Manager / Kubernetes Secrets (recommended)
+  - Optional: Supabase Vault for DB-internal secrets (server-side only)
+
+#### Other Services
 - **Redis**: `REDIS_PASSWORD` environment variable
 - **AWS**: IAM roles (no hardcoded credentials)
 - **Production**: AWS Secrets Manager / Kubernetes Secrets

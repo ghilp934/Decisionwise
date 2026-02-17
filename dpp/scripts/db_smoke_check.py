@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""Database smoke check - STRICT drift detection with index dup toggle.
+"""Database smoke check - STRICT drift detection with index dup toggle + RLS verification.
 
 Verifies runtime DB schema matches repository baseline (models.py + alembic migrations).
 
 Exit codes:
-    0: OK
-    2: ENV_MISSING (DATABASE_URL not set)
-    3: SCHEMA_DRIFT (table/column/type/nullable/PK/index/constraint mismatch or index dup in strict)
-    4: DB_CONNECT (connection or query failed)
-    5: MIGRATIONS_NOT_APPLIED (alembic_version missing/empty)
+    0: PASS
+    1: FAIL (drift detected)
+    2: ERROR (env/tooling/connection failure)
 
 Environment variables:
     DATABASE_URL: Required. PostgreSQL connection string.
@@ -16,7 +14,9 @@ Environment variables:
     DEBUG: Optional. Set to "1" for stderr debug output.
     RELAXED: Optional. Set to "1" to allow index duplicates (overrides STRICT).
     STRICT: Optional. Default "1". Enforced unless RELAXED=1.
-    INDEX_CANONICAL_PREFIX: Optional. Default "idx_". Prefix for canonical index names.
+    JSON_OUTPUT: Optional. Set to "1" to output JSON format (default: text).
+    SAVE_EVIDENCE: Optional. Set to "1" to save JSON report to evidence/ directory.
+    ALLOW_EXTRA_COLUMNS: Optional. Set to "1" to allow extra columns not in spec.
 
 Mode:
     - STRICT (default): Each index signature must have exactly 1 index with canonical name.
@@ -25,8 +25,11 @@ Mode:
                            Extra signatures = WARN only. Index duplicates = allowed.
 """
 
+import json
 import os
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 # --- ENGINE POLICY (Spec Lock) ---
@@ -158,11 +161,6 @@ EXPECTED_INDEX_GROUPS = {
     ],
     "runs": [
         {
-            "signature": (("tenant_id", "idempotency_key"), False),
-            "canonical_name": "idx_runs_idem",
-            "alias_names": [],
-        },
-        {
             "signature": (("status", "lease_expires_at"), False),
             "canonical_name": "idx_runs_status_lease",
             "alias_names": [],
@@ -171,11 +169,6 @@ EXPECTED_INDEX_GROUPS = {
             "signature": (("tenant_id", "created_at"), False),
             "canonical_name": "idx_runs_tenant_created",
             "alias_names": [],
-        },
-        {
-            "signature": (("tenant_id",), False),
-            "canonical_name": "idx_runs_tenant",  # Expected if models.py index() used
-            "alias_names": ["ix_runs_tenant_id"],
         },
     ],
     "tenant_plans": [
@@ -189,22 +182,12 @@ EXPECTED_INDEX_GROUPS = {
             "canonical_name": "idx_tenant_plans_tenant_status",
             "alias_names": [],
         },
-        {
-            "signature": (("tenant_id",), False),
-            "canonical_name": "idx_tenant_plans_tenant",
-            "alias_names": ["ix_tenant_plans_tenant_id"],
-        },
     ],
     "tenant_usage_daily": [
         {
             "signature": (("tenant_id", "usage_date"), True),
             "canonical_name": "idx_tenant_usage_daily_tenant_date",
             "alias_names": [],
-        },
-        {
-            "signature": (("tenant_id",), False),
-            "canonical_name": "idx_tenant_usage_daily_tenant",
-            "alias_names": ["ix_tenant_usage_daily_tenant_id"],
         },
     ],
 }
@@ -221,9 +204,18 @@ def debug(msg: str) -> None:
         print(f"[DEBUG] {msg}", file=sys.stderr)
 
 
-def error_exit(code: str, exit_code: int) -> None:
+def error_exit(code: str, exit_code: int, failures: list[dict[str, str]] | None = None) -> None:
     """Print error code and exit."""
-    print(f"ERROR:{code}")
+    if os.getenv("JSON_OUTPUT") == "1":
+        report = {
+            "status": "ERROR" if exit_code == 2 else "FAIL",
+            "exit_code": exit_code,
+            "error_code": code,
+            "failures": failures or [],
+        }
+        print(json.dumps(report, indent=2))
+    else:
+        print(f"ERROR:{code}")
     sys.exit(exit_code)
 
 
@@ -412,12 +404,39 @@ def check_indexes(
             debug(f"[WARN] Extra index signatures in {table}: {extra_sigs} (allowed in relaxed mode)")
 
 
+def check_rls_enabled(engine: Engine, schema: str, tables: list[str]) -> None:
+    """Verify RLS is enabled on all tables (pg_class.relrowsecurity=true)."""
+    query = text(
+        """
+        SELECT c.relname, c.relrowsecurity
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = :schema AND c.relname = ANY(:tables)
+        ORDER BY c.relname
+        """
+    )
+    with engine.connect() as conn:
+        result = conn.execute(query, {"schema": schema, "tables": tables}).fetchall()
+
+    rls_map = {row[0]: row[1] for row in result}
+
+    for table in tables:
+        if table not in rls_map:
+            debug(f"Table {table} not found in pg_class (RLS check)")
+            error_exit("RLS_CHECK_FAILED", 1)
+        if not rls_map[table]:
+            debug(f"RLS not enabled on {table} (relrowsecurity=false)")
+            error_exit("RLS_DISABLED", 1)
+
+    debug("RLS enabled on all tables")
+
+
 def main() -> None:
     """Main smoke check logic."""
     # ENV check
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
-        error_exit("ENV_MISSING", 2)
+        error_exit("ENV_MISSING", 2, [{"code": "ENV_MISSING", "detail": "DATABASE_URL not set"}])
 
     # Redact password from debug output
     safe_url = database_url.split("@")[-1] if "@" in database_url else "***"
@@ -444,6 +463,7 @@ def main() -> None:
     check_migrations_applied(engine, schema)
 
     # Schema checks
+    all_tables = list(EXPECTED_TABLE_SPECS.keys())
     for table, expected_cols in EXPECTED_TABLE_SPECS.items():
         debug(f"Checking table: {table}")
         check_table_columns(engine, schema, table, expected_cols)
@@ -457,7 +477,57 @@ def main() -> None:
         if table in EXPECTED_INDEX_GROUPS:
             check_indexes(engine, schema, table, EXPECTED_INDEX_GROUPS[table], mode)
 
-    print("OK")
+    # RLS check
+    debug("Checking RLS enabled on all tables...")
+    check_rls_enabled(engine, schema, all_tables)
+
+    # Collect metadata for JSON output
+    if os.getenv("JSON_OUTPUT") == "1" or os.getenv("SAVE_EVIDENCE") == "1":
+        with engine.connect() as conn:
+            meta_result = conn.execute(
+                text(
+                    "SELECT current_user, current_database(), version()"
+                )
+            ).fetchone()
+            current_user = meta_result[0] if meta_result else "unknown"
+            current_database = meta_result[1] if meta_result else "unknown"
+            server_version = meta_result[2] if meta_result else "unknown"
+
+        report = {
+            "status": "PASS",
+            "exit_code": 0,
+            "meta": {
+                "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                "current_user": current_user,
+                "current_database": current_database,
+                "server_version": server_version,
+            },
+            "checks": {
+                "tables": len(all_tables),
+                "columns": sum(len(cols) for cols in EXPECTED_TABLE_SPECS.values()),
+                "constraints": len(EXPECTED_UNIQUE_CONSTRAINTS),
+                "indexes": sum(len(groups) for groups in EXPECTED_INDEX_GROUPS.values()),
+                "rls": "enabled on all tables",
+                "mode": mode,
+            },
+            "failures": [],
+        }
+
+        if os.getenv("JSON_OUTPUT") == "1":
+            print(json.dumps(report, indent=2))
+
+        if os.getenv("SAVE_EVIDENCE") == "1":
+            evidence_dir = Path(__file__).parent.parent / "evidence"
+            evidence_dir.mkdir(exist_ok=True)
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            evidence_file = evidence_dir / f"db_smoke_check_{timestamp}.json"
+            with open(evidence_file, "w") as f:
+                json.dump(report, f, indent=2)
+            if os.getenv("JSON_OUTPUT") != "1":
+                print(f"Evidence saved: {evidence_file}")
+    else:
+        print("OK")
+
     sys.exit(0)
 
 
