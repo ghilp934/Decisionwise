@@ -515,6 +515,42 @@ Proprietary - All Rights Reserved
 
 ---
 
+## 📚 Operations & Runbooks
+
+### Supabase Production Guides
+
+**Connection Policy (SSOT)**:
+- [Supabase Connection SSOT](docs/supabase/00_supabase_ssot.md) - Pooler Transaction mode (port 6543), NullPool policy
+- [Secrets and API Keys Policy](docs/supabase/01_secrets_and_keys.md) - Why we don't use Supabase API Keys
+
+**Deployment Runbooks**:
+- [Supabase Production Hardening](ops/runbooks/supabase_hardening.md) - Network Restrictions (IP allowlist) checklist
+- [Database Backup and Restore](ops/runbooks/db_backup_restore.md) - pg_dump/pg_restore procedures
+- [Retention Cleanup Policy](ops/runbooks/retention_cleanup.md) - S3 result expiration (30 days default)
+
+**Validation Scripts**:
+```bash
+# Preflight validation (run before deployment)
+python scripts/supabase_preflight.py
+
+# Runtime secret hygiene check (CI/CD integration)
+python scripts/runtime_secret_hygiene_check.py
+
+# Database smoke check (schema drift detection)
+python scripts/db_smoke_check.py
+```
+
+**Backup Scripts**:
+```bash
+# Create backup
+./ops/scripts/db_backup_pgdump.sh
+
+# Restore and verify
+./ops/scripts/db_restore_verify.sh --file backups/dpp_20260217_120000.sql.gz --target-url "postgres://..."
+```
+
+---
+
 ## 🆘 Support
 
 - **On-Call Engineering**: PagerDuty rotation
