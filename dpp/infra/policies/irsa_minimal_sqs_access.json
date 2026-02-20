@@ -11,8 +11,8 @@
         "sqs:GetQueueUrl"
       ],
       "Resource": [
-        "arn:aws:sqs:ap-northeast-2:783268398937:dp-email-events-pilot",
-        "arn:aws:sqs:ap-northeast-2:783268398937:dp-email-events-dlq-pilot"
+        "arn:aws:sqs:ap-northeast-2:ACCOUNT_ID_PLACEHOLDER:dp-email-events-pilot",
+        "arn:aws:sqs:ap-northeast-2:ACCOUNT_ID_PLACEHOLDER:dp-email-events-dlq-pilot"
       ]
     }
   ]

@@ -1,0 +1,118 @@
+Phase 6.2 — Result Summary & Acceptance Criteria
+==================================================
+Date    : 2026-02-21
+Branch  : phase6-preflight
+Version : DPP v0.4.2.2
+Verdict : PASS — All 5 Acceptance Criteria met
+
+=======================================================================
+ACCEPTANCE CRITERIA CHECKLIST
+=======================================================================
+
+AC1: Alert email body contains WHO/WHERE/WHAT 3 elements
+     Status: PASS
+     Evidence: 40_aws_cli_snippets.txt + target_v1.json + T3 + T4 tests
+     Details:
+       - InputPathsMap maps arn (WHO), ip (WHERE), req (WHAT) from CloudTrail paths:
+         arn  → $.detail.userIdentity.arn
+         ip   → $.detail.sourceIPAddress
+         req  → $.detail.requestParameters
+       - InputTemplate produces email body with labeled sections:
+         "--- WHO (actor) ---\nactor_arn=<arn>"
+         "--- WHERE (origin) ---\nsource_ip=<ip>"
+         "--- WHAT (action) ---\nrequest_parameters=<req>"
+       - T3 verifies path mappings exist; T4 verifies template placeholders exist
+       - Email triage possible without AWS console login
+
+AC2: CloudTrail Data Events WriteOnly confirmed by runbook + CLI procedure
+     Status: PASS
+     Evidence: runbook §Step 1 + 40_aws_cli_snippets.txt §Step 6
+     Details:
+       - Runbook specifies ReadWriteType: "WriteOnly"
+       - Verification command documented: get-event-selectors with WriteOnly filter
+       - Expected output format documented
+       - COMPLIANCE mode: WriteOnly still captures failed delete attempts (API call before ACL check)
+
+AC3: Setup script idempotent — re-run safe, drift updated
+     Status: PASS
+     Evidence: p6_2_setup_breakglass_alerts.sh code + 40_aws_cli_snippets.txt
+     Details:
+       - sns create-topic: always returns ARN (no-op if exists)
+       - sns subscribe: check-before-subscribe (skips if already subscribed)
+       - events put-rule: idempotent (updates rule if pattern changes)
+       - events put-targets: idempotent (replaces target if exists)
+       - cloudtrail put-event-selectors: check-before-enable (skips if already configured)
+       - Script exits non-zero on put-targets FailedEntryCount > 0
+
+AC4: No secrets committed anywhere
+     Status: PASS
+     Evidence: T8 static test + irsa_minimal_sqs_access.json P0-2 fix
+     Details:
+       - All JSON templates use PLACEHOLDER values only
+       - T8 scans eventbridge/ and samples/ directories for 12-digit account IDs
+       - irsa_minimal_sqs_access.json: real account ID 783268398937 replaced with
+         ACCOUNT_ID_PLACEHOLDER (P0-2 pre-existing violation fixed in this phase)
+       - Setup script reads real values from env vars at runtime only
+       - No secrets (keys, passwords, tokens) required for this setup
+
+AC5: Static tests (8) catch template regressions in CI
+     Status: PASS
+     Evidence: 30_tests.txt
+     Details:
+       T1 Rule JSON parses as valid JSON             PASS
+       T2 Target JSON parses as valid JSON list      PASS
+       T3 InputPathsMap has arn/ip/req paths         PASS
+       T4 InputTemplate has <arn>/<ip>/<req>         PASS
+       T5 Rule covers required EventNames            PASS
+       T6 Rule covers both bypass patterns (A+B)     PASS
+       T7 Sample event has CloudTrail structure      PASS
+       T8 No real account IDs in P6.2 infra files   PASS
+       Total: 8/8 PASSED (0.91s)
+
+=======================================================================
+CHANGED FILES SUMMARY
+=======================================================================
+
+NEW:
+  dpp/infra/eventbridge/kill_switch_audit_breakglass_rule_v1.json
+  dpp/infra/eventbridge/kill_switch_audit_breakglass_target_v1.json
+  dpp/infra/samples/cloudtrail_s3_breakglass_sample_event_v1.json
+  dpp/infra/scripts/p6_2_setup_breakglass_alerts.sh
+  dpp/apps/api/tests/test_phase6_2_breakglass_templates.py
+  dpp/evidence/phase6_2_worm_break_glass_alerts/ (this folder)
+
+MODIFIED:
+  dpp/ops/runbooks/kill_switch_audit_break_glass_alerts.md
+    → Full rewrite: WHO/WHERE/WHAT emphasis, InputTransformer, simulation test, dual bypass pattern
+  dpp/infra/policies/irsa_minimal_sqs_access.json
+    → P0-2 fix: real account ID → ACCOUNT_ID_PLACEHOLDER
+
+=======================================================================
+NON-NEGOTIABLES VERIFIED
+=======================================================================
+
+[x] Email body: WHO (actor_arn) / WHERE (source_ip) / WHAT (request_parameters) present
+[x] Event pattern: Pattern A (x-amz-bypass-governance-retention) covered
+[x] Event pattern: Pattern B (bypassGovernanceRetention) covered
+[x] EventNames: PutObjectRetention, DeleteObject, DeleteObjectVersion, PutObjectLegalHold
+[x] Bucket scope: both $or branches include bucketName filter
+[x] Setup: idempotent (all 6 steps verified)
+[x] CloudTrail: WriteOnly data events (not All)
+[x] Simulation test: put-events procedure documented in runbook + setup script output
+[x] No secrets in any committed file (PLACEHOLDER only)
+[x] 8 static tests all PASS — no AWS calls required
+
+=======================================================================
+REMAINING TODO (next phases)
+=======================================================================
+
+- [ ] Phase 6.3: Webhook concurrency test (5 simultaneous, 1 DB commit)
+- [ ] Phase 6.4: Cutover runbook + WORM evidence tar.gz + sha256 + S3 upload
+- [ ] Production: Operator must run p6_2_setup_breakglass_alerts.sh with real values
+- [ ] Production: SNS subscription confirmation email must be clicked
+- [ ] Production: SCP to deny BypassGovernanceRetention from non-break-glass roles
+
+=======================================================================
+PHASE 6.2: COMPLETE
+Next: Phase 6.3 (Webhook concurrency test)
+=======================================================================

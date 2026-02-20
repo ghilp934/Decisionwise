@@ -1,0 +1,23 @@
+[
+  {
+    "_comment": "EventBridge Target: SNS with InputTransformer for WHO/WHERE/WHAT break-glass alert (Phase 6.2)",
+    "_placeholders": {
+      "TOPIC_ARN_PLACEHOLDER": "Replace with SNS topic ARN (e.g. arn:aws:sns:ap-northeast-2:ACCOUNT_ID:kill-switch-audit-break-glass-alerts)",
+      "note": "Applied via setup script p6_2_setup_breakglass_alerts.sh using jq substitution"
+    },
+    "Id": "kill-switch-audit-breakglass-sns-v1",
+    "Arn": "TOPIC_ARN_PLACEHOLDER",
+    "InputTransformer": {
+      "InputPathsMap": {
+        "arn":     "$.detail.userIdentity.arn",
+        "ip":      "$.detail.sourceIPAddress",
+        "req":     "$.detail.requestParameters",
+        "event":   "$.detail.eventName",
+        "time":    "$.detail.eventTime",
+        "region":  "$.detail.awsRegion",
+        "account": "$.account"
+      },
+      "InputTemplate": "\"[WORM BREAK-GLASS DETECTED]\\n\\nevent=<event>\\ntime=<time>\\nregion=<region>\\naccount=<account>\\n\\n--- WHO (actor) ---\\nactor_arn=<arn>\\n\\n--- WHERE (origin) ---\\nsource_ip=<ip>\\n\\n--- WHAT (action) ---\\nrequest_parameters=<req>\\n\\n--- ACTION REQUIRED ---\\n1. Verify this was authorized (check incident ticket).\\n2. If unauthorized: revoke s3:BypassGovernanceRetention from actor role immediately.\\n3. Run: aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,AttributeValue=DeleteObject\\n4. See runbook: dpp/ops/runbooks/kill_switch_audit_break_glass_alerts.md\""
+    }
+  }
+]

@@ -1,0 +1,165 @@
+Phase 6.2 — AWS CLI Setup Procedure (masked)
+=============================================
+Date    : 2026-02-21
+Note    : Actual AWS account/region/ARN values are masked with PLACEHOLDER.
+          The setup script p6_2_setup_breakglass_alerts.sh performs all steps below.
+
+Setup script location:
+  dpp/infra/scripts/p6_2_setup_breakglass_alerts.sh
+
+Pre-run (set env vars):
+  export AUDIT_BUCKET_NAME="<YOUR_AUDIT_BUCKET_NAME>"   # e.g. dpp-kill-switch-audit-prod
+  export ALERT_EMAIL="<SECURITY_TEAM_EMAIL>"            # e.g. security-team@example.com
+  export AWS_REGION="ap-northeast-2"
+  export AWS_PROFILE="dpp-admin"
+  export TRAIL_NAME="dpp-audit-trail"
+
+====================================================================
+Step 1/6: SNS Topic creation (idempotent)
+====================================================================
+
+Command:
+  aws sns create-topic \
+    --name kill-switch-audit-break-glass-alerts \
+    --query TopicArn --output text \
+    --region ap-northeast-2 --profile dpp-admin
+
+Expected output:
+  arn:aws:sns:ap-northeast-2:ACCOUNT_ID_PLACEHOLDER:kill-switch-audit-break-glass-alerts
+
+Note: create-topic is idempotent — returns existing ARN if topic already exists.
+
+====================================================================
+Step 2/6: Email subscription (check-before-subscribe)
+====================================================================
+
+Command:
+  aws sns subscribe \
+    --topic-arn "arn:aws:sns:ap-northeast-2:ACCOUNT_ID_PLACEHOLDER:kill-switch-audit-break-glass-alerts" \
+    --protocol email \
+    --notification-endpoint "<SECURITY_TEAM_EMAIL>" \
+    --region ap-northeast-2 --profile dpp-admin
+
+ACTION REQUIRED: Click the confirmation link in the subscription email.
+Alert delivery will NOT work until confirmed.
+
+====================================================================
+Step 3/6: SNS topic policy (allow EventBridge publish)
+====================================================================
+
+Policy applied via aws sns set-topic-attributes.
+Condition restricts publish to the specific EventBridge rule ARN only.
+
+====================================================================
+Step 4/6: EventBridge Rule creation/update
+====================================================================
+
+Template: dpp/infra/eventbridge/kill_switch_audit_breakglass_rule_v1.json
+Substitution: AUDIT_BUCKET_NAME_PLACEHOLDER → actual bucket name (via jq)
+
+Rule name  : KillSwitchAuditGovernanceBypass
+State      : ENABLED
+EventNames : PutObjectRetention, DeleteObject, DeleteObjectVersion, PutObjectLegalHold
+Bypass     : Pattern A (x-amz-bypass-governance-retention) OR Pattern B (bypassGovernanceRetention)
+Scope      : audit bucket only (bucketName filter in both $or branches)
+
+Verify rule:
+  aws events describe-rule \
+    --name KillSwitchAuditGovernanceBypass \
+    --region ap-northeast-2 --profile dpp-admin
+
+====================================================================
+Step 5/6: EventBridge Target with InputTransformer
+====================================================================
+
+Template: dpp/infra/eventbridge/kill_switch_audit_breakglass_target_v1.json
+Substitution: TOPIC_ARN_PLACEHOLDER → actual SNS topic ARN (via jq)
+
+InputPathsMap:
+  arn     → $.detail.userIdentity.arn           (WHO)
+  ip      → $.detail.sourceIPAddress             (WHERE)
+  req     → $.detail.requestParameters           (WHAT)
+  event   → $.detail.eventName
+  time    → $.detail.eventTime
+  region  → $.detail.awsRegion
+  account → $.account
+
+InputTemplate produces email body:
+  [WORM BREAK-GLASS DETECTED]
+  event=<event>
+  time=<time>
+  region=<region>
+  account=<account>
+  --- WHO (actor) ---
+  actor_arn=<arn>
+  --- WHERE (origin) ---
+  source_ip=<ip>
+  --- WHAT (action) ---
+  request_parameters=<req>
+  --- ACTION REQUIRED ---
+  ...
+
+Verify targets:
+  aws events list-targets-by-rule \
+    --rule KillSwitchAuditGovernanceBypass \
+    --region ap-northeast-2 --profile dpp-admin
+
+====================================================================
+Step 6/6: CloudTrail Data Events (WriteOnly, audit bucket)
+====================================================================
+
+Command:
+  aws cloudtrail put-event-selectors \
+    --trail-name dpp-audit-trail \
+    --event-selectors '[{
+      "ReadWriteType": "WriteOnly",
+      "IncludeManagementEvents": false,
+      "DataResources": [{
+        "Type": "AWS::S3::Object",
+        "Values": ["arn:aws:s3:::<YOUR_AUDIT_BUCKET_NAME>/"]
+      }]
+    }]' \
+    --region ap-northeast-2 --profile dpp-admin
+
+Verify:
+  aws cloudtrail get-event-selectors \
+    --trail-name dpp-audit-trail \
+    --query 'EventSelectors[?ReadWriteType==`WriteOnly`].DataResources' \
+    --region ap-northeast-2 --profile dpp-admin
+
+Expected: [[[{"Type": "AWS::S3::Object", "Values": ["arn:aws:s3:::<BUCKET>/"]}]]]
+
+====================================================================
+Simulation Test (put-events)
+====================================================================
+
+After setup completes, verify the full pipeline end-to-end:
+
+1. Prepare test event (substitute placeholders):
+   jq ... dpp/infra/samples/cloudtrail_s3_breakglass_sample_event_v1.json > /tmp/test_event.json
+
+2. Send to EventBridge default bus:
+   aws events put-events \
+     --entries "[$(cat /tmp/test_event.json)]" \
+     --region ap-northeast-2 --profile dpp-admin
+
+   Expected response:
+   {
+     "FailedEntryCount": 0,
+     "Entries": [{"EventId": "EXAMPLE_EVENT_ID"}]
+   }
+
+3. Check inbox within 60s for email with:
+   Subject: WORM BREAK-GLASS DETECTED (or similar SNS subject)
+   Body contains:
+     actor_arn=arn:aws:sts::ACCOUNT_ID_PLACEHOLDER:assumed-role/dpp-break-glass-role/...
+     source_ip=203.0.113.1
+     request_parameters={"bucketName":"<BUCKET>","x-amz-bypass-governance-retention":"true",...}
+
+====================================================================
+Security Notes
+====================================================================
+- All ARNs/account IDs in this evidence file use PLACEHOLDER values
+- Real values are only present in AWS account at runtime
+- Setup script reads real values from env vars at execution time
+- No secret values (keys, tokens, passwords) are involved in this setup
