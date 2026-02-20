@@ -71,3 +71,7 @@ prod-ca-*.pem
 supabase-ca*.crt
 supabase-ca*.cer
 supabase-ca*.pem
+
+# Phase 6 env secrets (template is tracked; actual file is NOT)
+dpp/ops/scripts/phase6_env.sh
+ops/scripts/phase6_env.sh

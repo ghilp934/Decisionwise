@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+# Phase 6 Pilot Deployment — Environment Variables Template
+#
+# Usage:
+#   1. Copy this file:
+#        cp ops/scripts/phase6_env.sh.template ops/scripts/phase6_env.sh
+#   2. Fill in all [REPLACE_*] values with actual secrets from AWS Secrets Manager
+#   3. Source before pilot deployment:
+#        source ops/scripts/phase6_env.sh
+#
+# SECURITY WARNINGS:
+#   - This file contains SECRETS (API keys, HMAC pepper, etc.)
+#   - DO NOT commit ops/scripts/phase6_env.sh to git (added to .gitignore)
+#   - Store actual secrets in AWS Secrets Manager, inject via ASCP at runtime
+#   - For production: use IRSA + ASCP sidecar, NOT this file
+#
+# Source of truth: k8s/secretproviderclass-dpp-secrets.yaml
+
+# ========================================
+# Database
+# ========================================
+
+# PostgreSQL connection string (Supabase Transaction Pooler, ap-northeast-2)
+# Format: postgresql://postgres.[REF]:[PASS]@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?sslmode=require
+export DATABASE_URL="postgresql://postgres.[REPLACE_PROJECT_REF]:[REPLACE_DB_PASSWORD]@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?sslmode=require"
+
+# ========================================
+# Redis
+# ========================================
+
+export REDIS_URL="[REPLACE_REDIS_URL]"
+
+# ========================================
+# PayPal (Payments)
+# ========================================
+
+# PayPal OAuth2 Client ID (Sandbox or Live)
+export PAYPAL_CLIENT_ID="[REPLACE_PAYPAL_CLIENT_ID]"
+
+# PayPal OAuth2 Client Secret
+export PAYPAL_CLIENT_SECRET="[REPLACE_PAYPAL_CLIENT_SECRET]"
+
+# PayPal API base URL
+# Sandbox:    https://api-m.sandbox.paypal.com
+# Production: https://api-m.paypal.com
+export PAYPAL_BASE_URL="https://api-m.sandbox.paypal.com"
+
+# PayPal Webhook ID (from PayPal Developer Dashboard → Webhooks)
+export PAYPAL_WEBHOOK_ID="[REPLACE_PAYPAL_WEBHOOK_ID]"
+
+# ========================================
+# Toss Payments (결제)
+# ========================================
+
+# Toss Payments Secret Key (테스트: test_sk_..., 라이브: live_sk_...)
+export TOSS_SECRET_KEY="[REPLACE_TOSS_SECRET_KEY]"
+
+# Toss Webhook Secret (선택적 — HMAC-SHA256 서명 검증용)
+# 미설정 시 서명 검증 건너뜀 (Phase 6.1에서 WARN 처리)
+export TOSS_WEBHOOK_SECRET="[REPLACE_TOSS_WEBHOOK_SECRET_OR_LEAVE_EMPTY]"
+
+# Toss API base URL
+export TOSS_BASE_URL="https://api.tosspayments.com"
+
+# ========================================
+# Kill-Switch Audit (WORM)
+# ========================================
+
+# Audit required (1 = 프로덕션 필수, 0 = dev/CI)
+export KILL_SWITCH_AUDIT_REQUIRED="1"
+
+# S3 WORM Audit Bucket (Object Lock 활성화된 버킷)
+export KILL_SWITCH_AUDIT_BUCKET="[REPLACE_AUDIT_BUCKET_NAME]"
+
+# WORM Retention Mode
+# GOVERNANCE: break-glass 가능 (Pilot 권장)
+# COMPLIANCE: 완전 불변 (Production 권장)
+export KILL_SWITCH_AUDIT_WORM_MODE="GOVERNANCE"
+
+# STRICT mode (1 = audit 실패 시 kill-switch 거부)
+export KILL_SWITCH_AUDIT_STRICT="1"
+
+# ========================================
+# Fingerprint HMAC (P5.9)
+# ========================================
+
+# Key-ID prefix for actor token fingerprints
+# Convention: kid_YYYYMM (월별 교체)
+export KILL_SWITCH_AUDIT_FINGERPRINT_KID="kid_202602"
+
+# HMAC pepper — Base64 encoded (recommended for production)
+# Generate: openssl rand -base64 32
+# Store in: AWS Secrets Manager → inject via ASCP
+export KILL_SWITCH_AUDIT_FINGERPRINT_PEPPER_B64="[REPLACE_BASE64_PEPPER]"
+
+# Alternative: UTF-8 plaintext pepper (dev/fallback only)
+# Do NOT use in production — use B64 variant above
+# export KILL_SWITCH_AUDIT_FINGERPRINT_PEPPER="[REPLACE_PLAINTEXT_PEPPER]"
+
+# ========================================
+# AWS Configuration
+# ========================================
+
+# AWS Region
+export AWS_DEFAULT_REGION="ap-northeast-2"
+
+# AWS Profile (for CLI commands)
+export AWS_PROFILE="dpp-admin"
+
+# For local testing with LocalStack:
+# export AWS_ENDPOINT_URL="http://localhost:4566"
+# export AWS_ACCESS_KEY_ID="test"
+# export AWS_SECRET_ACCESS_KEY="test"
+
+# ========================================
+# Application
+# ========================================
+
+# Admin token for kill-switch endpoint
+export DPP_ADMIN_TOKEN="[REPLACE_ADMIN_TOKEN]"
+
+# JWT Secret Key (for session tokens)
+export SECRET_KEY="[REPLACE_JWT_SECRET_KEY]"
+
+# Environment name
+export ENVIRONMENT="pilot"
+
+# Rate limiting
+export RATE_LIMIT_ENABLED="true"
+export RATE_LIMIT_REQUESTS_PER_MINUTE="60"
+
+# ========================================
+# SQS (Background Jobs)
+# ========================================
+
+export SQS_QUEUE_URL="[REPLACE_SQS_QUEUE_URL]"
+export SQS_ENDPOINT_URL=""  # Empty = use real AWS
+
+# ========================================
+# S3 (Results Bucket)
+# ========================================
+
+export S3_RESULT_BUCKET="[REPLACE_S3_RESULT_BUCKET]"
+export S3_ENDPOINT_URL=""  # Empty = use real AWS
+
+# ========================================
+# Validation (run after sourcing)
+# ========================================
+
+_validate_phase6_env() {
+  local errors=0
+
+  _check_required() {
+    local var_name="$1"
+    local value="${!var_name}"
+    if [[ -z "$value" ]] || [[ "$value" == *"[REPLACE"* ]]; then
+      echo "  ❌ MISSING: $var_name"
+      errors=$((errors + 1))
+    else
+      echo "  ✓  SET: $var_name (${#value} chars)"
+    fi
+  }
+
+  echo "================================================================="
+  echo "Phase 6 Environment Validation"
+  echo "================================================================="
+
+  _check_required DATABASE_URL
+  _check_required REDIS_URL
+  _check_required PAYPAL_CLIENT_ID
+  _check_required PAYPAL_CLIENT_SECRET
+  _check_required PAYPAL_WEBHOOK_ID
+  _check_required TOSS_SECRET_KEY
+  _check_required KILL_SWITCH_AUDIT_BUCKET
+  _check_required KILL_SWITCH_AUDIT_FINGERPRINT_KID
+  _check_required KILL_SWITCH_AUDIT_FINGERPRINT_PEPPER_B64
+  _check_required DPP_ADMIN_TOKEN
+  _check_required SECRET_KEY
+  _check_required SQS_QUEUE_URL
+  _check_required S3_RESULT_BUCKET
+
+  echo "================================================================="
+
+  if [[ $errors -gt 0 ]]; then
+    echo "❌  $errors required variable(s) missing or contain placeholder values."
+    echo "    Fill in ops/scripts/phase6_env.sh before proceeding."
+    return 1
+  else
+    echo "✅  All required environment variables are set."
+    return 0
+  fi
+}
+
+# Auto-validate on source
+_validate_phase6_env

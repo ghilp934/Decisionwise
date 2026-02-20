@@ -32,6 +32,13 @@ RC_TESTS=(
   "apps/api/tests/test_rc7_otel_contract.py"
   "apps/api/tests/test_rc8_release_packet_gate.py"
   "apps/api/tests/test_rc9_ops_pack_gate.py"
+  "apps/api/tests/test_rc10_logging_masking_and_worm_audit.py"
+  "apps/api/tests/test_rc11_workflow_hygiene_ephemeral_password.py"
+  "apps/api/tests/test_rc12_tls_drift_gate.py"
+  "apps/api/tests/test_rc13_worm_required_guard.py"
+  "apps/api/tests/test_rc10_webhook_error_semantics.py"
+  "apps/api/tests/test_rc10_worm_mode_hardening.py"
+  "apps/api/tests/test_rc10_p59_fingerprint_hmac_kid.py"
 )
 
 # Auto-dump logs on failure
