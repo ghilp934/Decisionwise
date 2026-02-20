@@ -1,0 +1,48 @@
+Phase 6.1 — Git Diff Stat (HEAD, Phase 6.1 files only)
+=======================================================
+Date    : 2026-02-21
+Branch  : phase6-preflight
+Command : git diff --stat HEAD -- <phase6.1 files>
+
+-------- MODIFIED FILES (4) --------
+
+ dpp/apps/api/dpp_api/main.py                 |  87 +++++++++++++++++-
+ dpp/apps/api/dpp_api/routers/health.py       |  12 +++
+ dpp/k8s/api-deployment.yaml                  | 132 ++++++++++++++++++++++++++-
+ dpp/k8s/secretproviderclass-dpp-secrets.yaml |  44 ++++++++-
+ 4 files changed, 266 insertions(+), 9 deletions(-)
+
+-------- NEW FILES (untracked → will be committed) --------
+
+ dpp/apps/api/dpp_api/audit/kill_switch_audit.py            (Phase 5.3/6.1 — validate_kill_switch_audit_fingerprint_config added)
+ dpp/apps/api/dpp_api/billing/active_preflight.py           (NEW — billing secrets active preflight module)
+ dpp/apps/api/tests/test_phase6_1_billing_secret_preflight.py  (NEW — 5 tests, T1-T5)
+ dpp/evidence/phase6_1_secrets_active_preflight/            (NEW — this evidence folder)
+
+-------- SUMMARY --------
+
+Key changes by file:
+- main.py (+87 lines): P6.1 startup_event additions
+    * import validate_kill_switch_audit_fingerprint_config
+    * import run_billing_secrets_active_preflight
+    * Boot-time fingerprint (kid/pepper) validation (lines ~540-560)
+    * Billing secrets active preflight call (lines ~562-580)
+
+- health.py (+12 lines): readyz billing_secrets cached status
+    * import get_billing_preflight_status
+    * billing_status computed from module-level cache (zero network call)
+    * "billing_secrets": billing_status added to services dict
+
+- api-deployment.yaml (+132 lines):
+    * 6 secretKeyRef env vars: PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET,
+      PAYPAL_WEBHOOK_ID, TOSS_SECRET_KEY, TOSS_WEBHOOK_SECRET,
+      KILL_SWITCH_AUDIT_FINGERPRINT_PEPPER_B64
+    * 8 non-secret env vars: KILL_SWITCH_AUDIT_REQUIRED, KILL_SWITCH_AUDIT_STRICT,
+      KILL_SWITCH_AUDIT_BUCKET, KILL_SWITCH_AUDIT_WORM_MODE,
+      KILL_SWITCH_AUDIT_FINGERPRINT_KID, PAYPAL_ENV,
+      DPP_BILLING_PREFLIGHT_REQUIRED, DPP_BILLING_PREFLIGHT_TIMEOUT_SECONDS
+
+- secretproviderclass-dpp-secrets.yaml (+44 lines):
+    * 6 jmesPath entries: paypal-client-id, paypal-client-secret, paypal-webhook-id,
+      toss-secret-key, toss-webhook-secret, ks-audit-fingerprint-pepper-b64
+    * 6 corresponding secretObjects.data entries

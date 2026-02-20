@@ -14,10 +14,14 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from dpp_api.audit.sinks import AuditSinkConfigError, validate_audit_required_config
+from dpp_api.audit.kill_switch_audit import validate_kill_switch_audit_fingerprint_config
+from dpp_api.billing.active_preflight import run_billing_secrets_active_preflight
 from dpp_api.context import budget_decision_var, plan_key_var, request_id_var, run_id_var
 from dpp_api.enforce import PlanViolationError
+from dpp_api.utils.sanitize import sanitize_str
 from dpp_api.rate_limiter import NoOpRateLimiter, RateLimiter
-from dpp_api.routers import health, runs, usage
+from dpp_api.routers import admin, auth, health, internal, runs, tokens, usage, webhooks
 from dpp_api.schemas import ProblemDetail
 from dpp_api.utils import configure_json_logging
 
@@ -72,6 +76,33 @@ app.add_middleware(
         "RateLimit-Policy", "RateLimit", "Retry-After"  # P0 Hotfix: IETF rate limit headers
     ],
 )
+
+
+# ============================================================================
+# P0-1: Kill Switch Middleware (MUST BE BEFORE Maintenance)
+# ============================================================================
+
+from dpp_api.middleware.kill_switch import KillSwitchMiddleware
+
+app.add_middleware(KillSwitchMiddleware)
+
+
+# ============================================================================
+# SMTP Smoke Test: Maintenance Mode Middleware
+# ============================================================================
+
+from dpp_api.middleware.maintenance import MaintenanceMiddleware
+
+app.add_middleware(MaintenanceMiddleware)
+
+
+# ============================================================================
+# P0-3: Logging Redaction Middleware (MUST BE LAST - runs first)
+# ============================================================================
+
+from dpp_api.middleware.logging_redaction import LoggingRedactionMiddleware
+
+app.add_middleware(LoggingRedactionMiddleware)
 
 
 # ============================================================================
@@ -420,10 +451,20 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
         instance=instance,
     )
 
-    # Log the actual exception for debugging (structured JSON logging with exc_info)
+    # Log the actual exception for debugging (P5.2: sanitized, no raw PII/secrets)
     import logging
     logger = logging.getLogger(__name__)
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    logger.error(
+        "UNHANDLED_EXCEPTION",
+        extra={
+            "error_type": type(exc).__name__,
+            "error_msg_sanitized": sanitize_str(str(exc)),
+            "request_path": request.url.path,
+            "method": request.method,
+            "payload_hash": getattr(request.state, "payload_hash", None),
+        },
+        exc_info=True,
+    )
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -453,6 +494,11 @@ def _get_title_for_status(status_code: int) -> str:
 app.include_router(health.router, tags=["health"])
 app.include_router(runs.router)  # API-01: Runs endpoints
 app.include_router(usage.router)  # STEP D: Usage analytics
+app.include_router(auth.router)  # Phase 2: Auth/Email Onboarding
+app.include_router(internal.router)  # SMTP Smoke Test: Internal endpoints
+app.include_router(admin.router)  # P0-1: Admin endpoints (kill switch)
+app.include_router(webhooks.router)  # P0-2: Billing webhooks (PayPal + Toss)
+app.include_router(tokens.router)  # P0-3: Token lifecycle management
 
 
 # ============================================================================
@@ -881,8 +927,42 @@ async def startup_event():
     RC-3: Initialize rate limiter with default configuration.
     - Production: NoOpRateLimiter (q=60, w=60)
     - Tests can override app.state.rate_limiter with DeterministicTestLimiter
+
+    P5.6: Audit sink config preflight (fail-fast, no network calls).
+    - KILL_SWITCH_AUDIT_REQUIRED=1 + no KILL_SWITCH_AUDIT_BUCKET → AuditSinkConfigError
+    - Prevents app from starting with a misconfigured audit pipeline in required mode.
     """
     app.state.rate_limiter = NoOpRateLimiter(quota=60, window=60)
+
+    # P5.6: Boot-time preflight — raises AuditSinkConfigError if REQUIRED=1 but bucket unset
+    try:
+        validate_audit_required_config()
+    except AuditSinkConfigError:
+        logger.critical(
+            "AUDIT_SINK_REQUIRED_BUT_NOT_CONFIGURED",
+            extra={"event": "startup.audit_sink_misconfigured"},
+        )
+        raise
+
+    # P6.1: Boot-time fingerprint (kid/pepper) validation — Fail-closed
+    _ks_required = os.getenv("KILL_SWITCH_AUDIT_REQUIRED", "0").strip() == "1"
+    _ks_strict = os.getenv("KILL_SWITCH_AUDIT_STRICT", "0").strip() == "1"
+    if _ks_required or _ks_strict:
+        try:
+            validate_kill_switch_audit_fingerprint_config()
+        except (RuntimeError, Exception) as fp_exc:
+            error_code = str(fp_exc).split(":")[0]
+            logger.critical(
+                "KILL_SWITCH_FINGERPRINT_CONFIG_INVALID",
+                extra={"error_code": error_code, "event": "startup.fingerprint_misconfigured"},
+            )
+            raise
+
+    # P6.1: Billing secrets active preflight — validates PayPal + Toss credentials at boot
+    # Only runs when DPP_BILLING_PREFLIGHT_REQUIRED is set (default "1" = active)
+    _billing_pf_flag = os.getenv("DPP_BILLING_PREFLIGHT_REQUIRED", "1").strip()
+    if _billing_pf_flag in {"0", "1"}:
+        await run_billing_secrets_active_preflight()
 
 
 # ============================================================================
@@ -978,6 +1058,7 @@ def create_app(
     new_app.include_router(health.router, tags=["health"])
     new_app.include_router(runs.router)
     new_app.include_router(usage.router)
+    new_app.include_router(auth.router)  # Phase 2: Auth/Email Onboarding
 
     # Test endpoint for RC-7 gate tests
     @new_app.get("/v1/test-ratelimit")

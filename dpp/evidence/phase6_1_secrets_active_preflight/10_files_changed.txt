@@ -1,0 +1,33 @@
+Phase 6.1 — Files Changed (NEW or MODIFIED for this phase)
+============================================================
+
+NEW (Phase 6.1 additions):
+  dpp/apps/api/dpp_api/billing/active_preflight.py
+  dpp/apps/api/tests/test_phase6_1_billing_secret_preflight.py
+  dpp/evidence/phase6_1_secrets_active_preflight/ (this folder)
+
+MODIFIED (Phase 6.1 changes):
+  dpp/apps/api/dpp_api/audit/kill_switch_audit.py
+    → Added validate_kill_switch_audit_fingerprint_config()
+
+  dpp/apps/api/dpp_api/main.py
+    → startup_event: imports + fingerprint validation + billing preflight call
+
+  dpp/apps/api/dpp_api/routers/health.py
+    → readyz: get_billing_preflight_status() added to services dict (no network call)
+
+  dpp/k8s/secretproviderclass-dpp-secrets.yaml
+    → 6 new jmesPath entries: paypal-client-id, paypal-client-secret, paypal-webhook-id,
+      toss-secret-key, toss-webhook-secret, ks-audit-fingerprint-pepper-b64
+    → 6 corresponding secretObjects.data entries
+
+  dpp/k8s/api-deployment.yaml
+    → 6 secretKeyRef env vars: PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_WEBHOOK_ID,
+      TOSS_SECRET_KEY, TOSS_WEBHOOK_SECRET, KILL_SWITCH_AUDIT_FINGERPRINT_PEPPER_B64
+    → Non-secret env vars: KILL_SWITCH_AUDIT_REQUIRED, KILL_SWITCH_AUDIT_STRICT,
+      KILL_SWITCH_AUDIT_BUCKET, KILL_SWITCH_AUDIT_WORM_MODE, KILL_SWITCH_AUDIT_FINGERPRINT_KID,
+      PAYPAL_ENV, DPP_BILLING_PREFLIGHT_REQUIRED, DPP_BILLING_PREFLIGHT_TIMEOUT_SECONDS
+
+  dpp/docs/P0-2_IMPLEMENTATION_SUMMARY.md
+    → Added: TOSS_WEBHOOK_SECRET, DPP_BILLING_PREFLIGHT_REQUIRED/TIMEOUT_SECONDS,
+      KILL_SWITCH_AUDIT_* series env vars (all placeholder values only)
