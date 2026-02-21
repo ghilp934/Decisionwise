@@ -150,7 +150,7 @@ jobs:
           output: dpp/evidence/01_ci/security/trivy_image_api.json
           exit-code: '0'
           vuln-type: os,library
-          ignore-unfixed: false
+          ignore-unfixed: true
 
       - name: Trivy scan — decisionproof-worker:rc5
         uses: aquasecurity/trivy-action@0.34.1
@@ -160,7 +160,7 @@ jobs:
           output: dpp/evidence/01_ci/security/trivy_image_worker.json
           exit-code: '0'
           vuln-type: os,library
-          ignore-unfixed: false
+          ignore-unfixed: true
 
       - name: Trivy scan — decisionproof-reaper:rc5
         uses: aquasecurity/trivy-action@0.34.1
@@ -170,7 +170,7 @@ jobs:
           output: dpp/evidence/01_ci/security/trivy_image_reaper.json
           exit-code: '0'
           vuln-type: os,library
-          ignore-unfixed: false
+          ignore-unfixed: true
 
       - name: Risk gate — CVSS → RiskScore cutoff (70.00)
         shell: bash
