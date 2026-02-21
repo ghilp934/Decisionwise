@@ -35,8 +35,8 @@ _EVIDENCE_OUT = DPP_ROOT / "evidence" / "security" / "tls_drift_gate_report.json
 
 # ── Helper ────────────────────────────────────────────────────────────────────
 
-def _run_gate(root: Path, out_path: Path) -> tuple[int, dict]:
-    """Invoke tls_drift_gate CLI and return (exit_code, report_dict)."""
+def _run_gate(root: Path, out_path: Path) -> tuple[int, dict, str]:
+    """Invoke tls_drift_gate CLI and return (exit_code, report_dict, stderr)."""
     cmd = [
         sys.executable,
         str(DRIFT_GATE),
@@ -50,7 +50,7 @@ def _run_gate(root: Path, out_path: Path) -> tuple[int, dict]:
             report = json.loads(out_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             pass
-    return result.returncode, report
+    return result.returncode, report, result.stderr
 
 
 def _save_evidence(report: dict) -> None:
@@ -79,7 +79,7 @@ class TestRC12TLSDriftGate:
           - report["scanned_files"] > 0  (confirms globs matched real files)
         """
         out = tmp_path / "report_t1.json"
-        code, report = _run_gate(DPP_ROOT, out)
+        code, report, gate_stderr = _run_gate(DPP_ROOT, out)
 
         # Persist evidence copy (non-fatal if fails)
         _save_evidence(report)
@@ -87,6 +87,8 @@ class TestRC12TLSDriftGate:
         assert code == 0, (
             f"RC-12 FAIL: sslmode=disable found in staging/prod deployment asset!\n"
             f"Hits: {report.get('hits', [])}\n"
+            f"Gate stderr: {gate_stderr!r}\n"
+            f"DPP_ROOT: {DPP_ROOT}\n"
             "Action: remove sslmode=disable from the affected file, or move the\n"
             "setting into a CI-only workflow (.github/workflows/**) which is\n"
             "explicitly excluded from this scan."
@@ -125,7 +127,7 @@ class TestRC12TLSDriftGate:
         )
 
         out = tmp_path / "report_t2.json"
-        code, report = _run_gate(tmp_path, out)
+        code, report, _gate_stderr = _run_gate(tmp_path, out)
 
         assert code == 2, (
             f"Expected exit code 2 (drift detected), got {code}.\n"
