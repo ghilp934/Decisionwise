@@ -428,7 +428,7 @@ def reconcile_stuck_claimed_run(
     repo = RunRepository(db)
 
     # Check if reservation exists in Redis
-    reservation = budget_manager.scripts.get_reservation(run_id)
+    reservation = budget_manager.scripts.get_reservation(tenant_id, run_id)
 
     if reservation:
         # Normal case: reservation exists, use standard reconcile path
@@ -440,7 +440,7 @@ def reconcile_stuck_claimed_run(
 
     # CRITICAL: Reservation missing - check settlement receipt
     # MS-6 PRINCIPLE: Receipt is the ONLY proof of settlement
-    receipt = budget_manager.scripts.get_settlement_receipt(run_id)
+    receipt = budget_manager.scripts.get_settlement_receipt(tenant_id, run_id)
 
     if not receipt:
         # NO RECEIPT = NO PROOF of settlement

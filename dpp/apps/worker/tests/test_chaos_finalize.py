@@ -167,7 +167,7 @@ def test_chaos_crash_after_claim_before_commit(db_session, budget_manager):
     assert run.money_state == "RESERVED"
 
     # And the reservation should still exist (money has not moved)
-    reservation = budget_manager.scripts.get_reservation(run.run_id)
+    reservation = budget_manager.scripts.get_reservation(run.tenant_id, run.run_id)
     assert reservation is not None
 
     print("\n[PASS] Crash-after-claim leaves run in CLAIMED+RESERVED state for recovery.")
@@ -268,7 +268,7 @@ def test_chaos_race_condition_worker_vs_reaper(tmp_path, redis_client):
     assert updated.status in ("COMPLETED", "FAILED")
 
     # Reservation must be gone after settlement.
-    assert budget_manager.scripts.get_reservation(run.run_id) is None
+    assert budget_manager.scripts.get_reservation(run.tenant_id, run.run_id) is None
     verify_db.close()
 
     print(f"\n[PASS] Race handled: {r_worker=} {r_reaper=} | settle_calls=1")
@@ -311,7 +311,7 @@ def test_chaos_crash_after_settle_before_db_commit_requires_reconcile(db_session
             )
 
     # At this point: Redis reservation is consumed...
-    assert budget_manager.scripts.get_reservation(run.run_id) is None
+    assert budget_manager.scripts.get_reservation(run.tenant_id, run.run_id) is None
 
     # ...but DB is still CLAIMED+RESERVED (inconsistent).
     db_session.refresh(run)
@@ -319,7 +319,7 @@ def test_chaos_crash_after_settle_before_db_commit_requires_reconcile(db_session
     assert run.money_state == "RESERVED"
 
     # MS-6: Verify settlement receipt was created (PROOF of settlement!)
-    receipt = budget_manager.scripts.get_settlement_receipt(run.run_id)
+    receipt = budget_manager.scripts.get_settlement_receipt(run.tenant_id, run.run_id)
     assert receipt is not None, "Settlement receipt should exist (proof of settle success)"
     assert int(receipt["charged_usd_micros"]) == 500_000, "Receipt should have correct charge"
     assert receipt["tenant_id"] == run.tenant_id, "Receipt should have correct tenant_id"

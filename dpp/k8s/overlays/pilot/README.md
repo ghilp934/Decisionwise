@@ -1,11 +1,23 @@
 # DPP Pilot Overlay — 배포 당일 절차
 
+## SSOT 값 관리
+
+운영 값(`HOST`, `ACM ARN`, `SG ID`, `APP_HOST`)은 **`pilot.params.yaml` 1곳만 수정**하면 됩니다.
+수정 후 아래 명령으로 ingress/configmap을 자동 동기화하세요.
+
+```bash
+# 1. pilot.params.yaml 수정 (SSOT)
+# 2. 동기화 실행 (ingress-pilot.yaml + patch-configmap-pilot.yaml 자동 업데이트)
+./sync_pilot_values.sh
+# 3. PRE-GATE 검증 (params ↔ ingress 동일성 포함)
+./pre_gate_check.sh
+```
+
 ## 사전조건
 
-1. **REPLACE_ME_* 값 확정** (PRE-GATE 통과 조건):
-   - `pilot.params.yaml`: `PILOT_HOST`, `PILOT_ACM_CERT_ARN`, `PILOT_ALB_SECURITY_GROUP_ID`
-   - `ingress-pilot.yaml`: `REPLACE_ME_PILOT_HOST`, `REPLACE_ME_PILOT_ACM_CERT_ARN`, `REPLACE_ME_PILOT_ALB_SG`
-   - `patch-configmap-pilot.yaml`: `REPLACE_ME_PILOT_APP_HOST`
+1. **운영 값 확정** (PRE-GATE 통과 조건):
+   - `pilot.params.yaml` 수정: `PILOT_HOST`, `PILOT_APP_HOST`, `PILOT_ACM_CERT_ARN`, `PILOT_ALB_SECURITY_GROUP_ID`
+   - `./sync_pilot_values.sh` 실행 → `ingress-pilot.yaml`, `patch-configmap-pilot.yaml` 자동 업데이트
 
 2. **dpp-supabase-ca ConfigMap 준비** (운영자가 인증서 파일 제공):
    ```bash
@@ -21,6 +33,14 @@
    - AWS Secrets Manager에 `decisionproof/pilot/dpp-secrets` JSON secret 생성 완료
    > ⚠️ `secretObjects`(K8s Secret sync)는 **Pod가 CSI 볼륨을 실제로 마운트해야** 동작합니다.
    > Pod 없이 `kubectl apply`만으로는 `dpp-secrets` Secret이 생성되지 않습니다.
+
+---
+
+## Kube-Context Guard (필수)
+
+배포 전 `pilot_cutover.env`의 `EXPECTED_KUBE_CONTEXT`를 실제 컨텍스트 이름으로 확정해야 합니다.
+`pilot_cutover_execute.sh`는 시작 시 현재 컨텍스트와 비교하며, 불일치 시 즉시 FAIL 합니다.
+**원클릭 실행**: `./pilot_cutover_execute.sh` (sync → gate → DB → deploy → rollout 자동 진행)
 
 ---
 

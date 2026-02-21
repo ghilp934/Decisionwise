@@ -1,7 +1,7 @@
 # RC-5 API Inventory Report
 
-**Generated At:** 2026-02-15T08:20:16.550977+00:00  
-**Commit:** `6cb033dd`  
+**Generated At:** 2026-02-21T02:54:14.297204+00:00  
+**Commit:** `8d3f9bb8`  
 **App Entrypoint:** `dpp_api.main:app`  
 
 ---
@@ -11,7 +11,7 @@
 **Status:** [OK] PASS  
 **Missing in OpenAPI:** 0  
 **Extra in OpenAPI:** 0  
-**Total Public Routes:** 11  
+**Total Public Routes:** 25  
 **Total Hidden Routes:** 4  
 
 ## Hidden Endpoints

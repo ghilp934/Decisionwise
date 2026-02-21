@@ -69,7 +69,7 @@ def test_redis_reserve_lua(budget_scripts: BudgetScripts):
     assert new_balance == 3_000_000  # $5.00 - $2.00 = $3.00
 
     # Verify reservation exists
-    reservation = budget_scripts.get_reservation(run_id)
+    reservation = budget_scripts.get_reservation(tenant_id, run_id)
     assert reservation is not None
     assert reservation["tenant_id"] == tenant_id
     assert reservation["reserved_usd_micros"] == 2_000_000
@@ -126,7 +126,7 @@ def test_redis_settle_lua(budget_scripts: BudgetScripts):
     assert new_balance == 3_500_000  # $3.00 + $0.50 = $3.50
 
     # Reservation should be deleted
-    assert budget_scripts.get_reservation(run_id) is None
+    assert budget_scripts.get_reservation(tenant_id, run_id) is None
 
 
 def test_redis_settle_no_reserve(budget_scripts: BudgetScripts):
@@ -158,7 +158,7 @@ def test_redis_refund_full_lua(budget_scripts: BudgetScripts):
     assert new_balance == 5_000_000  # Back to $5.00
 
     # Reservation should be deleted
-    assert budget_scripts.get_reservation(run_id) is None
+    assert budget_scripts.get_reservation(tenant_id, run_id) is None
 
 
 def test_reserve_success(budget_manager: BudgetManager, sample_run_for_budget: Run):

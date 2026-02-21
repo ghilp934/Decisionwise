@@ -265,7 +265,7 @@ def test_chaos_redis_auto_reconnect_preserves_money(
     restore_connection()  # Auto-reconnect
 
     # Step 3: Verify reservation still exists after reconnect
-    reservation = budget_scripts.get_reservation(run_id)
+    reservation = budget_scripts.get_reservation(tenant_id, run_id)
     assert reservation is not None, "Reservation lost after Redis reconnect!"
     assert reservation["reserved_usd_micros"] == 5_000_000
 

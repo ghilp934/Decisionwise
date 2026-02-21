@@ -7,7 +7,7 @@ across modules.
 # Budget & Reservation
 RESERVATION_TTL_SECONDS = 3600  # 1 hour - Redis reservation expiration
 """
-TTL for Redis reservation keys (reserve:{run_id}).
+TTL for Redis reservation keys (reserve:{tenant_id}:{run_id}).
 
 CRITICAL: This value MUST match:
 - redis_scripts.py: self.redis.expire(reserve_key, RESERVATION_TTL_SECONDS)

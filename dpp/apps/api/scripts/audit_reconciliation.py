@@ -74,8 +74,14 @@ def get_redis_reserved_total(budget_scripts: BudgetScripts) -> tuple[int, int]:
             else:
                 key_str = key
 
-            run_id = key_str.replace("reserve:", "")
-            reservation = budget_scripts.get_reservation(run_id)
+            # Key format: "reserve:{tenant_id}:{run_id}"
+            remainder = key_str[len("reserve:"):]  # "{tenant_id}:{run_id}"
+            brace_end = remainder.find("}:")
+            if brace_end == -1:
+                continue  # unexpected format, skip
+            tenant_id = remainder[1:brace_end]
+            run_id = remainder[brace_end + 2:]
+            reservation = budget_scripts.get_reservation(tenant_id, run_id)
             if reservation:
                 total_reserved += reservation["reserved_usd_micros"]
                 count += 1

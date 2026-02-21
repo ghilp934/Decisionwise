@@ -12,4 +12,6 @@ data:
   AWS_REGION: "ap-northeast-2"
   SQS_QUEUE_URL: "https://sqs.ap-northeast-2.amazonaws.com/783268398937/dpp-runs-pilot"
   S3_RESULT_BUCKET: "dpp-results-pilot"
-  CORS_ALLOWED_ORIGINS: "https://REPLACE_ME_PILOT_APP_HOST"
+  CORS_ALLOWED_ORIGINS: "https://app-pilot.decisionproof.io.kr"
+  DPP_ACK_SUPABASE_NETWORK_RESTRICTIONS: "1"
+  DPP_BILLING_PREFLIGHT_REQUIRED: "0"

@@ -7,10 +7,8 @@
 #   - spec: $patch:replace → base의 host:api.example.com 규칙이 섞이지 않도록
 #     pilot host 하나만 남김
 #
-# ⚠️ 배포 전 반드시 교체:
-#   REPLACE_ME_PILOT_HOST           → e.g. api-pilot.example.com
-#   REPLACE_ME_PILOT_ACM_CERT_ARN   → e.g. arn:aws:acm:ap-northeast-2:783268398937:certificate/...
-#   REPLACE_ME_PILOT_ALB_SG         → e.g. sg-0123abcd...
+# ⚠️ 이 파일을 직접 편집하지 마세요.
+#   pilot_tls.env 수정 → ./sync_pilot_tls_values.sh 실행 → 자동 업데이트됩니다.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -25,15 +23,16 @@ metadata:
     alb.ingress.kubernetes.io/ssl-redirect: "443"
     alb.ingress.kubernetes.io/healthcheck-path: /readyz
 
-    # TODO(필수): 배포 전 실제 값으로 교체 (pre_gate_check.sh 통과 조건)
-    alb.ingress.kubernetes.io/certificate-arn: REPLACE_ME_PILOT_ACM_CERT_ARN
-    alb.ingress.kubernetes.io/security-groups: REPLACE_ME_PILOT_ALB_SG
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:783268398937:certificate/8b0225d0-8ff7-40ea-80fb-2b11167ca77c
+    alb.ingress.kubernetes.io/security-groups: sg-09caf889f951e4d02
+    # custom SG(security-groups) 지정 시 ALB Controller가 백엔드 SG 규칙도 직접 관리하도록 필수
+    alb.ingress.kubernetes.io/manage-backend-security-group-rules: "true"
 
     alb.ingress.kubernetes.io/tags: Environment=pilot,Application=dpp-api,Version=0.4.2.2
 spec:
   $patch: replace
   rules:
-  - host: REPLACE_ME_PILOT_HOST
+  - host: api-pilot.decisionproof.io.kr
     http:
       paths:
       - path: /

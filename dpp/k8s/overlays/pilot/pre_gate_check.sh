@@ -3,11 +3,12 @@
 # Pilot PRE-GATE 자동 점검 스크립트
 #
 # 검증 항목:
-#   [1/4] dpp-production 네임스페이스 누출 검사
-#   [2/4] ${...} 토큰 누출 검사
-#   [3/4] us-east-1 리전 누출 검사 (Seoul: ap-northeast-2 기준)
-#   [4/4] REPLACE_ME_* 미확정 TODO 검사
-#   [5/4] kubectl client-side dry-run (표준 리소스)
+#   [1/4]   dpp-production 네임스페이스 누출 검사
+#   [2/4]   ${...} 토큰 누출 검사
+#   [3/4]   us-east-1 리전 누출 검사 (Seoul: ap-northeast-2 기준)
+#   [4/4]   REPLACE_ME_* 미확정 TODO 검사
+#   [4.5/4] SSOT 동일성 체크 (pilot.params.yaml ↔ ingress-pilot.yaml)
+#   [5/4]   kubectl client-side dry-run (표준 리소스)
 #         Note: SecretProviderClass는 클러스터에 CRD가 설치되어야 검증 가능.
 #               로컬 dry-run에서는 CRD 리소스를 제외하고 표준 K8s 리소스만 검사.
 #
@@ -65,6 +66,70 @@ if grep -n "REPLACE_ME_" "$OUT"; then
   exit 1
 fi
 echo "  OK: no REPLACE_ME_* found"
+
+# [4.5/4] SSOT 동일성 체크 (params vs ingress HOST/CERT/SG 쌍 비교)
+echo "[4.5/4] SSOT consistency check (pilot.params.yaml ↔ ingress-pilot.yaml)..."
+PARAMS_FILE="$ROOT/pilot.params.yaml"
+INGRESS_FILE="$ROOT/ingress-pilot.yaml"
+
+extract_param() {
+  local key="$1"
+  python3 - "$PARAMS_FILE" "$key" << 'PYEOF'
+import sys, re
+p, k = sys.argv[1], sys.argv[2]
+with open(p, encoding='utf-8') as f:
+    c = f.read()
+m = re.search(r'^\s*' + re.escape(k) + r'\s*:\s*["\']?([^"\'#\r\n]+?)["\']?\s*$', c, re.MULTILINE)
+print(m.group(1).strip() if m else "")
+PYEOF
+}
+
+P_HOST=$(extract_param "PILOT_HOST")
+P_CERT=$(extract_param "PILOT_ACM_CERT_ARN")
+P_SG=$(extract_param "PILOT_ALB_SECURITY_GROUP_ID")
+
+# ingress에서 값 추출 (경로를 argv로 전달 — 공백/한글 경로 안전)
+extract_ingress() {
+  local field="$1"
+  python3 - "$INGRESS_FILE" "$field" << 'PYEOF'
+import sys, re
+path, field = sys.argv[1], sys.argv[2]
+with open(path, encoding='utf-8') as f:
+    c = f.read()
+if field == "host":
+    m = re.search(r'^\s*-\s*host:\s*(.+)$', c, re.MULTILINE)
+elif field == "cert":
+    m = re.search(r'certificate-arn:\s*(.+)', c)
+elif field == "sg":
+    m = re.search(r'security-groups:\s*(.+)', c)
+else:
+    m = None
+print(m.group(1).strip() if m else "")
+PYEOF
+}
+
+I_HOST=$(extract_ingress "host")
+I_CERT=$(extract_ingress "cert")
+I_SG=$(extract_ingress "sg")
+
+MISMATCH=0
+if [ "$P_HOST" != "$I_HOST" ]; then
+  echo "  MISMATCH: HOST params=$P_HOST ingress=$I_HOST"
+  MISMATCH=1
+fi
+if [ "$P_CERT" != "$I_CERT" ]; then
+  echo "  MISMATCH: CERT params=$P_CERT ingress=$I_CERT"
+  MISMATCH=1
+fi
+if [ "$P_SG" != "$I_SG" ]; then
+  echo "  MISMATCH: SG params=$P_SG ingress=$I_SG"
+  MISMATCH=1
+fi
+if [ "$MISMATCH" -eq 1 ]; then
+  echo "FAIL: params ↔ ingress mismatch. Run ./sync_pilot_values.sh to fix."
+  exit 1
+fi
+echo "  OK: HOST/CERT/SG match between pilot.params.yaml and ingress-pilot.yaml"
 
 # [5/4] Client-side dry-run
 # CRD(SecretProviderClass)는 로컬 kubectl에 타입이 등록되어 있어야 적용 가능.

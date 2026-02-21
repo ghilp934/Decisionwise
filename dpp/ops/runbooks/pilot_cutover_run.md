@@ -61,6 +61,17 @@ export DPP_K8S_NAMESPACE="dpp-staging"
 
 ---
 
+## Pilot-only Operational Notes
+
+> **Billing Preflight (DPP_BILLING_PREFLIGHT_REQUIRED=0)**
+> Pilot 환경에서는 PayPal/Toss 크레덴셜이 없으므로 billing preflight를 스킵합니다.
+> `/readyz` 응답에서 `billing_secrets: skipped`로 표시되며 이는 정상 동작입니다.
+> Production에서는 기본값 `DPP_BILLING_PREFLIGHT_REQUIRED=1`이 유지되어야 합니다.
+> 해당 설정은 `k8s/overlays/pilot/patch-api-deployment-pilot.yaml`에만 존재하고
+> `k8s/base/` 또는 `k8s/overlays/production*`에는 절대 포함되어서는 안 됩니다.
+
+---
+
 ## Execution Order (One-shot)
 
 ### Run 1: Steps 1-3 (automated) + exit 2 (human DB gate)

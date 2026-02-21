@@ -1,20 +1,20 @@
 # RC-5 Sensitive Data Scan Report
 
-**Generated At:** 2026-02-15T08:21:12.599020+00:00  
-**Commit:** `6cb033dd`  
+**Generated At:** 2026-02-21T02:55:16.471293+00:00  
+**Commit:** `8d3f9bb8`  
 
 ---
 
 ## Forensic Scope Evidence
 
 ### Repository Scan
-- **Scanned Files Count:** 207  
-- **Excluded Files Count (tests/):** 51  
+- **Scanned Files Count:** 342  
+- **Excluded Files Count (tests/):** 70  
 - **Root Path:** `C:\Users\ghilp\OneDrive\바탕 화면\배성무일반\0_디플런트 DEFFERENT\Decisionwise\decisionwise_api_platform\dpp`  
 
 ### Docker Scan
 - **Docker Available:** True  
-- **Docker Version:** Client=29.2.0, Server=29.2.0  
+- **Docker Version:** Client=29.2.1, Server=29.2.1  
 - **Expected Images:** `decisionproof-api:rc5`, `decisionproof-worker:rc5`, `decisionproof-reaper:rc5`, `decisionproof-api:rc5-trap`  
 
 **Scanned Images:**
@@ -28,14 +28,14 @@
   - Image ID: `sha256:811ae9727c72e486e59b8e9633adccc05c30a0ff483ba4a024699167e745e06d`  
   - Tar Entries: 24  
 - **decisionproof-api:rc5-trap**  
-  - Image ID: `sha256:7b5fdfb1be39cb0d961eca17801390ca228e1187c56db42071e2f75747705623`  
+  - Image ID: `sha256:a6045da0775d61f9482ac6ed2267e6cb01f47e13e3d8340cf52d4a92ecbd6ad3`  
   - Tar Entries: 24  
 
 ### Timing
-- **Repo Scan Duration:** 0.12s  
-- **Docker Build Duration:** 0.34s  
-- **Docker Scan Duration:** 22.54s  
-- **Total Duration:** 23.07s  
+- **Repo Scan Duration:** 0.16s  
+- **Docker Build Duration:** 0.38s  
+- **Docker Scan Duration:** 23.92s  
+- **Total Duration:** 24.53s  
 
 ## Summary
 

@@ -160,7 +160,7 @@ class TestRC4FinalizeInvariants:
             f"Refund went negative! refund={refund_usd_micros}"
 
         # Verify no settlement receipt duplication (Redis)
-        receipt_key = f"settle_receipt:{run_id}"
+        receipt_key = f"settle_receipt:{{{tenant_id}}}:{run_id}"
         receipt = redis_client.hgetall(receipt_key)
         assert receipt, "Settlement receipt missing"
 
@@ -250,7 +250,7 @@ class TestRC4FinalizeInvariants:
         assert stuck_run.money_state == "RESERVED"  # DB not updated
 
         # But Redis has the receipt!
-        receipt_key = f"settle_receipt:{run_id}"
+        receipt_key = f"settle_receipt:{{{tenant_id}}}:{run_id}"
         receipt = redis_client.hgetall(receipt_key)
         assert receipt, "Settlement receipt exists despite DB rollback"
 

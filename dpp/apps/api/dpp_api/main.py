@@ -959,9 +959,10 @@ async def startup_event():
             raise
 
     # P6.1: Billing secrets active preflight — validates PayPal + Toss credentials at boot
-    # Only runs when DPP_BILLING_PREFLIGHT_REQUIRED is set (default "1" = active)
+    # Only runs when DPP_BILLING_PREFLIGHT_REQUIRED=1 (default).
+    # "0" = skip entirely → /readyz shows billing_secrets as "skipped" (non-blocking).
     _billing_pf_flag = os.getenv("DPP_BILLING_PREFLIGHT_REQUIRED", "1").strip()
-    if _billing_pf_flag in {"0", "1"}:
+    if _billing_pf_flag == "1":
         await run_billing_secrets_active_preflight()
 
 
