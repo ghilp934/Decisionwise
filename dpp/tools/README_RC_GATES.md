@@ -1,5 +1,357 @@
 # RC Gates One-shot Execution
 
+## RC Gates Summary
+
+| Gate | File | Coverage |
+|------|------|----------|
+| RC-1 | test_rc1_contract.py | API contract |
+| RC-2 | test_rc2_error_format.py | RFC 9457 error format |
+| RC-3 | test_rc3_rate_limit_headers.py | IETF RateLimit headers |
+| RC-4 | test_rc4_billing_invariants.py | Billing invariants (API) |
+| RC-4 | test_rc4_finalize_invariants.py | Billing invariants (worker) |
+| RC-5 | test_rc5_gate.py | Docker build smoke |
+| RC-6 | test_rc6_observability.py | Structured logging |
+| RC-7 | test_rc7_otel_contract.py | OpenTelemetry contract |
+| RC-8 | test_rc8_release_packet_gate.py | Release packet |
+| RC-9 | test_rc9_ops_pack_gate.py | Ops pack |
+| **RC-10** | **test_rc10_logging_masking_and_worm_audit.py** | **Log masking + WORM audit** |
+| **RC-11** | **test_rc11_workflow_hygiene_ephemeral_password.py** | **Workflow hygiene: ephemeral password** |
+| **RC-12** | **test_rc12_tls_drift_gate.py** | **TLS drift guard: sslmode=disable absent in staging/prod** |
+| **RC-13** | **test_rc13_worm_required_guard.py** | **WORM required guard: no silent FileAuditSink fallback** |
+| **RC-10.P5.7** | **test_rc10_webhook_error_semantics.py** | **Webhook error taxonomy: retry storm prevention** |
+| **RC-10.P5.8** | **test_rc10_worm_mode_hardening.py** | **WORM mode hardening: explicit GOVERNANCE/COMPLIANCE, no bypass** |
+| **RC-10.P5.9** | **test_rc10_p59_fingerprint_hmac_kid.py** | **Fingerprint hardening: HMAC(pepper) + Key-ID prefix, rotation-ready** |
+
+## RC-10: Log Masking + Kill-Switch WORM Audit (P5.2 + P5.3)
+
+### What it tests
+
+| Test | Scenario | Pass Condition |
+|------|----------|----------------|
+| A | Webhook log with PII/Bearer token | `[REDACTED]` in log, `payload_hash` present |
+| B | `exc_info=True` log with secret in exception | No raw secret in `exc_info` field |
+| C | `sanitize_str` on 50 000-char input | < 1 s, returns `[TRUNCATED len=N sha256=...]` |
+| D | STRICT=1 + FailingAuditSink | HTTP 500, kill-switch state unchanged, no raw token in logs |
+| E | STRICT=0 + FailingAuditSink | HTTP 200, `audit_write_ok=false` |
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `KILL_SWITCH_AUDIT_BUCKET` | _(unset)_ | S3 bucket with Object Lock enabled. If set, uses S3WormAuditSink |
+| `KILL_SWITCH_AUDIT_REGION` | `AWS_DEFAULT_REGION` | AWS region for the audit bucket |
+| `KILL_SWITCH_AUDIT_FILE_DIR` | `tempdir` | Local fallback directory for FileAuditSink |
+| `KILL_SWITCH_AUDIT_STRICT` | `0` | `1` = fail-closed (HTTP 500 on sink failure) |
+
+### Quick verification
+
+```bash
+# RC-10 only
+pytest apps/api/tests/test_rc10_logging_masking_and_worm_audit.py -v
+
+# With STRICT mode
+KILL_SWITCH_AUDIT_STRICT=1 pytest apps/api/tests/test_rc10_logging_masking_and_worm_audit.py::TestRC10LogMaskingAndWormAudit::test_d_strict_mode_audit_failure_returns_500 -v
+```
+
+---
+
+## RC-11: Workflow Hygiene — Ephemeral Password (P5.4)
+
+### Purpose
+
+Prevent password-like literals from appearing in public CI workflow files, and enforce
+an ephemeral per-run password strategy with masking so that no static credential can
+be extracted from the public repository.
+
+### What it tests
+
+| Test | Scenario | Pass Condition |
+|------|----------|----------------|
+| A | Workflow file exists at `.github/workflows/phase45_db_rollback_drill.yml` | File readable |
+| B | Banned literal `drillpw2026` is absent | `"drillpw2026" not in text` |
+| C | Ephemeral password strategy is present | `DRILL_PG_PASSWORD` job env **and** `POSTGRES_PASSWORD` both set to `drill-${{ github.run_id }}-${{ github.run_attempt }}` |
+| D | `LOCAL_DB_URL` uses env var (no inline password) | `${DRILL_PG_PASSWORD}` or `$DRILL_PG_PASSWORD` referenced in workflow |
+| E | Ephemeral password is masked | `::add-mask::` **and** `DRILL_PG_PASSWORD` present in workflow |
+
+### Quick verification
+
+```bash
+# RC-11 only
+pytest apps/api/tests/test_rc11_workflow_hygiene_ephemeral_password.py -v
+```
+
+### FAIL criteria
+
+Any of these causes RC-11 to FAIL (CI is blocked):
+- `drillpw2026` (or any new static password literal) reintroduced in the workflow
+- `DRILL_PG_PASSWORD` job env var removed or changed to a static value
+- `POSTGRES_PASSWORD` service env set to a static value
+- `LOCAL_DB_URL` built with an inline password instead of `${DRILL_PG_PASSWORD}`
+- `::add-mask::` step removed
+
+---
+
+## RC-12: TLS / DB URL Drift Guard (P5.5)
+
+### Purpose
+
+Fail CI if `sslmode=disable` (a CI/local-only setting) leaks into staging/prod
+deployment assets. Config drift at this level disables server certificate
+verification in production, which is a critical TLS misconfiguration.
+
+### Scan scope
+
+**INCLUDED** (deployment assets only):
+- `k8s/**/*.yml, k8s/**/*.yaml` — Kubernetes manifests
+- `infra/**/*.tf, infra/**/*.json, infra/**/*.yml, infra/**/*.yaml` — IaC
+- `ops/scripts/**/*.sh, *.template, *.sql` — Operational deploy scripts
+
+**EXCLUDED** (may legitimately use sslmode=disable):
+- `evidence/**`, `**/.git/**`, `.github/workflows/**`
+- `**/*.md` — documentation/runbooks
+- `infra/docker-compose.yml` — local-dev only
+
+### What it tests
+
+| Test | Scenario | Pass Condition |
+|------|----------|----------------|
+| T1 | Repo-wide scan on actual tree | exit 0, `ok=True`, `scanned_files > 0` |
+| T2 | Synthetic staging manifest with `sslmode=disable` | exit 2, `ok=False`, exactly 1 hit, `excerpt == "sslmode=disable"` |
+
+### Quick verification
+
+```bash
+# RC-12 only (drop addopts to avoid coverage noise)
+pytest -q -o addopts= apps/api/tests/test_rc12_tls_drift_gate.py
+
+# Standalone drift gate CLI
+python tools/security/tls_drift_gate.py --root . --out evidence/security/tls_drift_gate_report.json
+```
+
+### What to do on failure
+
+RC-12 FAILS when `sslmode=disable` appears in a scoped file.
+
+**Option A (preferred)**: Remove `sslmode=disable` from the affected manifest/script.
+  Production DB URLs must use `sslmode=require` or `sslmode=verify-full`.
+
+**Option B**: If the file is CI-only and not a staging/prod asset, move it into
+  `.github/workflows/**` (explicitly excluded) or document why it belongs in the
+  CI-only category and add it to `DEFAULT_EXCLUDE_PATTERNS` in `tls_drift_gate.py`.
+
+---
+
+## RC-10.P5.7: Webhook Error Semantics — Retry Storm Prevention (P5.7)
+
+### Purpose
+
+Enforce strict HTTP status code taxonomy for webhook endpoints (PayPal + Toss) to prevent
+retry storms. Providers retry 5xx responses but not 4xx. Misclassifying client faults as
+server faults causes exponential retry storms that are hard to diagnose.
+
+### Status Code Taxonomy
+
+| Class | Condition | HTTP | Error Code |
+|-------|-----------|------|------------|
+| A | Invalid JSON / malformed payload | 400 | WEBHOOK_INVALID_JSON |
+| B | Signature invalid / verify != SUCCESS | 401 | WEBHOOK_SIGNATURE_INVALID |
+| C | Required header missing | 400 | WEBHOOK_MISSING_HEADERS |
+| D | Our misconfig (missing secret/webhook_id) | 500 | WEBHOOK_PROVIDER_MISCONFIG |
+| E | Upstream network/SDK error during verify | 500 | WEBHOOK_VERIFY_UPSTREAM_FAILED |
+| F | Internal DB/processing error | 500 | WEBHOOK_INTERNAL_ERROR |
+
+**500 is ONLY for D/E/F. Signature mismatch is NEVER 500.**
+
+### What it tests
+
+| Test | Scenario | Pass Condition |
+|------|----------|----------------|
+| A | Invalid JSON to `/webhooks/paypal` | 400, `WEBHOOK_INVALID_JSON` log with `payload_hash` |
+| B | PayPal `verify_webhook_signature` returns `FAILURE` | 401 (not 500), warning log, no `Retry-After` |
+| C | PayPal verify raises `httpx.RequestError` | 500, `WEBHOOK_VERIFY_UPSTREAM_FAILED` log, `Retry-After: 60` |
+| D | Toss HMAC signature mismatch | 401, `WEBHOOK_SIGNATURE_INVALID` warning log |
+| E | No false positive: logs emitted AND secrets absent | `WEBHOOK_RECEIVED` present; raw token NOT in log output |
+
+### Mocking approach
+
+- Tests B and C: `patch("dpp_api.routers.webhooks.get_paypal_client", return_value=mock_paypal)`
+- Test D: Set `TOSS_WEBHOOK_SECRET` env var + provide wrong `X-TossPayments-Signature`
+- Test E: No mock needed — PAYPAL_CLIENT_ID not configured in CI → WEBHOOK_PROVIDER_MISCONFIG
+
+### Quick verification
+
+```bash
+# P5.7 only
+pytest apps/api/tests/test_rc10_webhook_error_semantics.py -v -o addopts=
+
+# All P5 gates
+pytest apps/api/tests/test_rc10_logging_masking_and_worm_audit.py \
+       apps/api/tests/test_rc10_webhook_error_semantics.py \
+       apps/api/tests/test_rc11_workflow_hygiene_ephemeral_password.py \
+       apps/api/tests/test_rc12_tls_drift_gate.py \
+       apps/api/tests/test_rc13_worm_required_guard.py \
+       -v -o addopts=
+```
+
+### FAIL criteria
+
+Any of these causes P5.7 to FAIL:
+- Signature mismatch returns 5xx (retry storm risk)
+- Network/upstream error returns 4xx (wrong taxonomy)
+- 5xx response missing `Retry-After` header
+- Log not emitted on failure (silent swallow)
+- Raw payload content or tokens appear in any log line
+
+---
+
+## RC-10.P5.8: WORM Mode Hardening (P5.8)
+
+### Purpose
+
+Ensure the S3 WORM audit sink is truly immutable by enforcing explicit WORM mode selection
+(`GOVERNANCE` or `COMPLIANCE`) and preventing any bypass behavior in PutObject calls.
+
+### What it tests
+
+| Test | Scenario | Pass Condition |
+|------|----------|----------------|
+| A | `put_record()` PutObject call | Both `ObjectLockMode` AND `ObjectLockRetainUntilDate` present as a paired set; RetainUntilDate is UTC-aware |
+| B[GOVERNANCE] | `S3WormAuditSink(mode="GOVERNANCE")` | `put_object` kwargs `ObjectLockMode == "GOVERNANCE"` |
+| B[COMPLIANCE] | `S3WormAuditSink(mode="COMPLIANCE")` | `put_object` kwargs `ObjectLockMode == "COMPLIANCE"` |
+| C | `REQUIRED=1` + bucket set + `WORM_MODE` absent | `AuditSinkConfigError` with `WORM_MODE_REQUIRED_BUT_NOT_SET` |
+| C2 | `REQUIRED=1` + invalid `WORM_MODE` value | `AuditSinkConfigError` with `INVALID_WORM_MODE` |
+| D | `put_record()` bypass audit | No `BypassGovernanceRetention` in kwargs; all params in allowed prefix set |
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `KILL_SWITCH_AUDIT_WORM_MODE` | `GOVERNANCE` (non-required mode) | `GOVERNANCE` or `COMPLIANCE`. **Mandatory** when `REQUIRED=1`. |
+| `KILL_SWITCH_AUDIT_REQUIRED` | `0` | `1` = WORM is mandatory; explicit WORM_MODE required |
+
+### Quick verification
+
+```bash
+# P5.8 only
+pytest apps/api/tests/test_rc10_worm_mode_hardening.py -v -o addopts=
+
+# All P5 gates
+pytest apps/api/tests/test_rc10_logging_masking_and_worm_audit.py \
+       apps/api/tests/test_rc10_webhook_error_semantics.py \
+       apps/api/tests/test_rc10_worm_mode_hardening.py \
+       apps/api/tests/test_rc11_workflow_hygiene_ephemeral_password.py \
+       apps/api/tests/test_rc12_tls_drift_gate.py \
+       apps/api/tests/test_rc13_worm_required_guard.py \
+       -v -o addopts=
+```
+
+### FAIL criteria
+
+Any of these causes P5.8 to FAIL:
+- `S3WormAuditSink` does not accept `mode` parameter
+- `put_object` call missing `ObjectLockMode` or `ObjectLockRetainUntilDate`
+- `put_object` includes `BypassGovernanceRetention` or any unexpected bypass parameter
+- `REQUIRED=1` + absent `WORM_MODE` does NOT raise `AuditSinkConfigError`
+- `REQUIRED=1` + invalid `WORM_MODE` does NOT raise `AuditSinkConfigError`
+
+---
+
+## RC-10.P5.9: Fingerprint HMAC + Key-ID Prefix (P5.9)
+
+### Purpose
+
+Replace the plain SHA-256 actor token fingerprint with HMAC-SHA256(pepper) and a Key-ID
+prefix. Format: `<kid>:<12 hex chars>`. The kid prefix identifies the pepper epoch, enabling
+safe key rotation without losing historical record verifiability.
+
+### What it tests
+
+| Test | Scenario | Pass Condition |
+|------|----------|----------------|
+| T1 | `fingerprint_token("tok_live_ABC123")` with kid + pepper set | Result matches `^kid_test:[0-9a-f]{12}$` |
+| T2 | Same token + same pepper (×2); same token + different pepper | Identical for same; different for different pepper; exact HMAC cross-check |
+| T3 | `REQUIRED=1` + no pepper | `RuntimeError("FINGERPRINT_PEPPER_NOT_SET")` |
+| T3b | `STRICT=1` + no pepper | Same RuntimeError |
+| T4 | `build_kill_switch_audit_record(actor_token=raw_sensitive_token)` | raw token absent from JSON; fingerprint present and matches `<kid>:[0-9a-f]{12}` |
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `KILL_SWITCH_AUDIT_FINGERPRINT_KID` | `kid_dev` | Key-ID prefix. Must change when pepper changes. Use `kid_YYYYMM` convention. |
+| `KILL_SWITCH_AUDIT_FINGERPRINT_PEPPER_B64` | _(unset)_ | Base64 pepper (preferred). **Mandatory** when REQUIRED=1 or STRICT=1. |
+| `KILL_SWITCH_AUDIT_FINGERPRINT_PEPPER` | _(unset)_ | UTF-8 pepper (fallback). Same mandatory condition. |
+
+### Quick verification
+
+```bash
+# P5.9 only
+pytest apps/api/tests/test_rc10_p59_fingerprint_hmac_kid.py -v -o addopts=
+
+# All P5 gates (32 tests)
+pytest apps/api/tests/test_rc10_logging_masking_and_worm_audit.py \
+       apps/api/tests/test_rc10_webhook_error_semantics.py \
+       apps/api/tests/test_rc10_worm_mode_hardening.py \
+       apps/api/tests/test_rc10_p59_fingerprint_hmac_kid.py \
+       apps/api/tests/test_rc11_workflow_hygiene_ephemeral_password.py \
+       apps/api/tests/test_rc12_tls_drift_gate.py \
+       apps/api/tests/test_rc13_worm_required_guard.py \
+       -v -o addopts=
+```
+
+### FAIL criteria
+
+Any of these causes P5.9 to FAIL:
+- `fingerprint_token()` does not exist or cannot be imported
+- Fingerprint format does not include kid prefix (e.g., returns plain hex)
+- HMAC is not pepper-sensitive (same result for different peppers)
+- Missing pepper with REQUIRED=1 does NOT raise RuntimeError
+- Raw token appears in audit record JSON
+- `actor.token_fingerprint` is absent or does not match `<kid>:[0-9a-f]{12}`
+
+---
+
+## RC-13: WORM Required Guard + Break-glass Alert Plan (P5.6)
+
+### Purpose
+
+Prevent silent `FileAuditSink` fallback in production by enforcing the
+`KILL_SWITCH_AUDIT_REQUIRED=1` configuration guard. When required mode is on,
+the application must fail closed rather than silently downgrading to local file logging.
+
+### What it tests
+
+| Test | Scenario | Pass Condition |
+|------|----------|----------------|
+| T1 | `REQUIRED=1` + missing `KILL_SWITCH_AUDIT_BUCKET` | `validate_audit_required_config()` raises `AuditSinkConfigError` with `AUDIT_SINK_REQUIRED_BUT_NOT_CONFIGURED` |
+| T2 | `REQUIRED=1` + no bucket → `POST /admin/kill-switch` | HTTP 500, kill-switch mode **unchanged**, no raw token in response body |
+| T3 | `REQUIRED=1` + bucket set | `get_default_audit_sink()` returns `S3WormAuditSink`, never `FileAuditSink` |
+| T4 | Break-glass runbook file exists | `ops/runbooks/kill_switch_audit_break_glass_alerts.md` contains: `Break-glass`, `CloudTrail`, `EventBridge`, `SNS`, `bypassGovernanceRetention` |
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `KILL_SWITCH_AUDIT_REQUIRED` | `0` | `1` = WORM is mandatory; `FileAuditSink` fallback forbidden |
+| `KILL_SWITCH_AUDIT_BUCKET` | _(unset)_ | Required when `AUDIT_REQUIRED=1` |
+
+### Quick verification
+
+```bash
+# RC-13 only
+pytest apps/api/tests/test_rc13_worm_required_guard.py -v
+```
+
+### FAIL criteria
+
+RC-13 FAILS when any of:
+- `AuditSinkConfigError` is not raised when `REQUIRED=1` and bucket is unset
+- `/admin/kill-switch` returns non-500 when audit is required but not configured
+- Kill-switch state changes despite audit misconfiguration
+- Break-glass runbook missing or lacking required headings
+
+---
+
 ## Usage
 
 **Mac/Linux:**
@@ -104,7 +456,8 @@ evidence/01_ci/<timestamp>/
      apps/api/tests/test_rc6_observability.py \
      apps/api/tests/test_rc7_otel_contract.py \
      apps/api/tests/test_rc8_release_packet_gate.py \
-     apps/api/tests/test_rc9_ops_pack_gate.py
+     apps/api/tests/test_rc9_ops_pack_gate.py \
+     apps/api/tests/test_rc10_logging_masking_and_worm_audit.py
    ```
 
 ## Script Behavior

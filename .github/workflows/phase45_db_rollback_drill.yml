@@ -17,7 +17,7 @@ jobs:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_PASSWORD: drillpw2026
+          POSTGRES_PASSWORD: drill-${{ github.run_id }}-${{ github.run_attempt }}
           POSTGRES_DB: dpp_drill
           POSTGRES_USER: postgres
         ports:
@@ -31,6 +31,7 @@ jobs:
     env:
       PHASE_EVIDENCE_DIR: evidence/phase4_5_rollback_drill
       REVISION_TARGET: ${{ inputs.revision_target }}
+      DRILL_PG_PASSWORD: drill-${{ github.run_id }}-${{ github.run_attempt }}
 
     defaults:
       run:
@@ -49,18 +50,22 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]" --quiet
 
+      - name: Mask ephemeral drill password
+        run: |
+          echo "::add-mask::$DRILL_PG_PASSWORD"
+
       - name: Configure local DB URL (GHA service container)
         run: |
           # NOTE: Supabase Supavisor (ap-northeast-2) does not route project
           # vbxgpkhtpzqqguclupbw externally — "Tenant or user not found" error.
           # Method A: Use GitHub Actions PostgreSQL service container instead.
           # Drill scope is identical: Alembic upgrade->downgrade->upgrade rehearsal.
-          LOCAL_DB_URL="postgresql://postgres:drillpw2026@localhost:5432/dpp_drill?sslmode=disable"
+          LOCAL_DB_URL="postgresql://postgres:${DRILL_PG_PASSWORD}@localhost:5432/dpp_drill?sslmode=disable"
           echo "DATABASE_URL_MIGRATIONS=${LOCAL_DB_URL}" >> "$GITHUB_ENV"
           echo "DP_ENV=staging" >> "$GITHUB_ENV"
           echo ""
           echo "  [Method A] Using GHA PostgreSQL service container"
-          echo "  DB: localhost:5432/dpp_drill (ephemeral)"
+          echo "  DB: localhost:5432/dpp_drill (ephemeral, run-scoped)"
           echo "  DP_ENV=staging (production guardrails disabled)"
 
       - name: Verify prerequisites

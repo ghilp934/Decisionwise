@@ -2,10 +2,21 @@
 
 Spec Lock: Supabase pooler + NullPool policy + Production guardrails.
 - Default: NullPool (client-side pooling disabled)
-- Supabase hosts: sslmode=require enforced
+- Supabase PROD: sslmode=verify-full enforced + CA bundle required (DPP_DB_SSLROOTCERT)
+- Supabase non-PROD: sslmode=require (default when DPP_DB_SSLMODE unset)
 - PROD: Pooler Transaction mode (port 6543) enforced
 - PROD: ACK variables required for deployment safety
 - ENV: DPP_DB_POOL=nullpool|queuepool (default: nullpool)
+- ENV: DPP_DB_SSLMODE=require|verify-ca|verify-full (PROD+Supabase default: "verify-full")
+- ENV: DPP_DB_SSLROOTCERT=<path> (required for verify-ca/verify-full)
+
+SSL Policy (Spec Lock) — delegated to dpp_api.db.ssl_policy:
+  DPP_DB_SSLMODE set   → ENV is authoritative (SSOT).
+                           URL sslmode conflict + PROD → RuntimeError.
+                           URL sslmode conflict + DEV  → WARNING log.
+  DPP_DB_SSLMODE unset → URL sslmode (if present) used (legacy compat).
+                           Neither set → verify-full (PROD+Supabase) or require (else).
+  PROD + Supabase host → sslmode MUST be verify-full; sslrootcert MUST be readable.
 """
 
 import os
@@ -16,10 +27,18 @@ from urllib.parse import urlparse
 from sqlalchemy import Engine, NullPool, QueuePool, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from dpp_api.db.ssl_policy import (
+    effective_sslmode,
+    get_sslrootcert,
+    resolve_ssl_settings,
+    validate_ssl_settings,
+)
+from dpp_api.db.url_policy import is_supabase_host
+
 
 def _is_supabase_host(url: str) -> bool:
-    """Check if URL points to Supabase host (.supabase.co or .pooler.supabase.com)."""
-    return ".supabase.co" in url or ".pooler.supabase.com" in url
+    """Check if URL points to Supabase host. Delegates to url_policy.is_supabase_host."""
+    return is_supabase_host(url)
 
 
 def _mask_password(url: str) -> str:
@@ -51,12 +70,20 @@ def _validate_supabase_production_config(url: str, dp_env: str) -> None:
     # Parse URL
     parsed = urlparse(url)
 
-    # P0-1: SSL Mode enforcement
-    if "sslmode=require" not in url:
+    # P0-1: SSL Mode enforcement (PROD + Supabase requires verify-full).
+    # Spec Lock: effective_sslmode() applies ENV-SSOT precedence (DPP_DB_SSLMODE over URL).
+    #   May raise RuntimeError if ENV and URL conflict in PROD.
+    eff_mode = effective_sslmode(url, dp_env)
+    if eff_mode != "verify-full":
         raise RuntimeError(
-            "PRODUCTION GUARDRAIL: Supabase connections MUST use sslmode=require. "
-            "Add '?sslmode=require' to DATABASE_URL or include in connect_args."
+            f"PRODUCTION GUARDRAIL: Supabase DB connection requires sslmode=verify-full "
+            f"in production, got '{eff_mode}'. "
+            "Set DPP_DB_SSLMODE=verify-full in environment and mount the Supabase CA "
+            "ConfigMap (DPP_DB_SSLROOTCERT=/etc/ssl/certs/supabase-ca/supabase-ca.crt). "
+            "See ops/runbooks/db_ssl_verify_full.md for setup instructions."
         )
+    # Also confirm CA bundle is present and readable for verify-full.
+    validate_ssl_settings(eff_mode, get_sslrootcert())
 
     # P0-1: Port 6543 enforcement (Pooler Transaction mode)
     port = parsed.port
@@ -186,12 +213,13 @@ def build_engine(database_url: str | None = None) -> Engine:
     dp_env = os.getenv("DP_ENV", "").lower()
     _validate_supabase_production_config(url, dp_env)
 
-    # Supabase SSL enforcement
+    # Supabase SSL enforcement via connect_args (SSOT: ssl_policy.resolve_ssl_settings).
+    # Handles sslmode + sslrootcert from ENV, applies PROD defaults (verify-full),
+    # and fails fast if the CA bundle is missing for CA-required modes.
+    # Non-Supabase hosts return {} (no enforcement from this layer).
     connect_args: dict[str, Any] = {}
     if _is_supabase_host(url):
-        # Only add sslmode if not already in URL
-        if "sslmode=" not in url:
-            connect_args["sslmode"] = "require"
+        connect_args = resolve_ssl_settings(url, dp_env)
 
     # Application name (P0-1: connection tagging for observability)
     app_name = os.getenv("DPP_DB_APPLICATION_NAME", "decisionproof-api")

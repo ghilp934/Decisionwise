@@ -18,6 +18,7 @@ from dpp_api.context import (
     run_id_var,
     tenant_id_var,
 )
+from dpp_api.utils.sanitize import sanitize_exc, sanitize_obj, sanitize_str
 
 
 class JSONFormatter(logging.Formatter):
@@ -45,7 +46,7 @@ class JSONFormatter(logging.Formatter):
         log_data: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
-            "message": record.getMessage(),
+            "message": sanitize_str(record.getMessage()),
             "module": record.module,
             "func": record.funcName,
             "line": record.lineno,
@@ -103,9 +104,9 @@ class JSONFormatter(logging.Formatter):
         if span_id:
             log_data["span_id"] = str(span_id)
 
-        # Add exception info if present
+        # Add exception info if present (P5.2: sanitize traceback)
         if record.exc_info:
-            log_data["exc_info"] = self.formatException(record.exc_info)
+            log_data["exc_info"] = sanitize_exc(record.exc_info)
 
         # Add any extra fields from logger.info(..., extra={...})
         for key, value in record.__dict__.items():
@@ -133,8 +134,10 @@ class JSONFormatter(logging.Formatter):
                 "stack_info",
                 "trace_id",
                 "span_id",
+                "otelTraceID",
+                "otelSpanID",
             ):
-                log_data[key] = value
+                log_data[key] = sanitize_obj(value)
 
         return json.dumps(log_data)
 

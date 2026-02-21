@@ -116,6 +116,59 @@ def test_no_silent_bucket_default_in_s3_client():
     )
 
 
+def test_no_hardcoded_supabase_credentials():
+    """
+    T3-D: Repository files MUST NOT contain hardcoded Supabase connection strings with passwords.
+
+    Pattern detected: postgres://user:password@*.supabase.co:*/...
+    Scans: all .py files in the dpp/ directory tree.
+    Exceptions: test fixture files are allowed to contain example/dummy URLs.
+    """
+    import re
+    from pathlib import Path
+
+    # Repo root: 4 levels up from this test file (tests/ -> api/ -> apps/ -> dpp/)
+    dpp_root = Path(__file__).parent.parent.parent.parent
+
+    # Supabase credential pattern: password between : and @ followed by supabase host.
+    # Catches: postgres://user:REALPASSWORD@db.supabase.co:5432/...
+    # Does NOT trigger on: [PASSWORD] or <password> or $PASSWORD placeholders.
+    cred_pattern = re.compile(
+        r"postgres(?:ql)?://[^:@\s]+:[^@\[\]<>$\s]{6,}@[^\s]*\.supabase\."
+    )
+
+    violations = []
+
+    for py_file in dpp_root.rglob("*.py"):
+        # Skip __pycache__ and venv directories.
+        if "__pycache__" in str(py_file) or ".venv" in str(py_file):
+            continue
+        # Skip test files (may have dummy example URLs).
+        if py_file.name.startswith("test_") or py_file.parent.name == "tests":
+            continue
+
+        try:
+            content = py_file.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, PermissionError):
+            continue
+
+        for line_no, line in enumerate(content.splitlines(), start=1):
+            # Skip comment lines.
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            if cred_pattern.search(line):
+                violations.append(f"{py_file.relative_to(dpp_root)}:{line_no}: {stripped[:120]}")
+
+    assert not violations, (
+        "SECURITY: Hardcoded Supabase credentials found in repository:\n"
+        + "\n".join(f"  {v}" for v in violations)
+        + "\n\nFix: Replace with ENV reference (os.getenv('DATABASE_URL')) "
+        "and remove from version control. "
+        "See E항목 in P0-SSL Phase 2 patch spec."
+    )
+
+
 def test_config_env_module_exists():
     """
     T3-C: Verify centralized config/env.py module exists.
