@@ -1,0 +1,138 @@
+Phase 6.1 — K8s Manifest Snippets (secrets redacted to <placeholder>)
+=======================================================================
+Date    : 2026-02-21
+Files   : dpp/k8s/secretproviderclass-dpp-secrets.yaml
+          dpp/k8s/api-deployment.yaml
+
+NOTE: All actual secret values replaced with <placeholder>. Only structural
+      additions from Phase 6.1 are shown. Keys/paths are not secret.
+
+=======================================================================
+FILE: dpp/k8s/secretproviderclass-dpp-secrets.yaml  (PHASE 6.1 ADDITIONS)
+=======================================================================
+
+# --- NEW jmesPath entries added to spec.parameters.jmesPath array ---
+
+        - path: "paypal_client_id"
+          objectAlias: "paypal-client-id"
+        - path: "paypal_client_secret"
+          objectAlias: "paypal-client-secret"
+        - path: "paypal_webhook_id"
+          objectAlias: "paypal-webhook-id"
+        - path: "toss_secret_key"
+          objectAlias: "toss-secret-key"
+        - path: "toss_webhook_secret"
+          objectAlias: "toss-webhook-secret"
+        - path: "ks_audit_fingerprint_pepper_b64"
+          objectAlias: "ks-audit-fingerprint-pepper-b64"
+
+# --- NEW secretObjects.data entries added ---
+
+      data:
+        - objectName: paypal-client-id
+          key: paypal-client-id
+        - objectName: paypal-client-secret
+          key: paypal-client-secret
+        - objectName: paypal-webhook-id
+          key: paypal-webhook-id
+        - objectName: toss-secret-key
+          key: toss-secret-key
+        - objectName: toss-webhook-secret
+          key: toss-webhook-secret
+        - objectName: ks-audit-fingerprint-pepper-b64
+          key: ks-audit-fingerprint-pepper-b64
+
+=======================================================================
+FILE: dpp/k8s/api-deployment.yaml  (PHASE 6.1 ADDITIONS)
+=======================================================================
+
+# --- NEW secretKeyRef env vars (6 secrets via dpp-secrets K8s Secret) ---
+
+        # Phase 6.1: Payment provider secrets (injected via ASCP -> dpp-secrets)
+        - name: PAYPAL_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: dpp-secrets
+              key: paypal-client-id
+        - name: PAYPAL_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dpp-secrets
+              key: paypal-client-secret
+        - name: PAYPAL_WEBHOOK_ID
+          valueFrom:
+            secretKeyRef:
+              name: dpp-secrets
+              key: paypal-webhook-id
+        - name: TOSS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: dpp-secrets
+              key: toss-secret-key
+        - name: TOSS_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dpp-secrets
+              key: toss-webhook-secret
+              optional: true   # TOSS_WEBHOOK_SECRET is optional (signature verification)
+        # Phase 6.1: HMAC pepper for kill-switch audit fingerprinting (P5.9)
+        - name: KILL_SWITCH_AUDIT_FINGERPRINT_PEPPER_B64
+          valueFrom:
+            secretKeyRef:
+              name: dpp-secrets
+              key: ks-audit-fingerprint-pepper-b64
+
+# --- NEW non-secret env vars (8 config values) ---
+
+        # Phase 6.1: Kill-switch audit config (non-secret)
+        # Override per environment: staging=GOVERNANCE, production=COMPLIANCE
+        - name: KILL_SWITCH_AUDIT_REQUIRED
+          value: "1"
+        - name: KILL_SWITCH_AUDIT_STRICT
+          value: "1"
+        - name: KILL_SWITCH_AUDIT_BUCKET
+          value: "<REPLACE_WITH_WORM_BUCKET_NAME>"
+        - name: KILL_SWITCH_AUDIT_WORM_MODE
+          value: "GOVERNANCE"    # Pilot: GOVERNANCE | Production locked: COMPLIANCE
+        - name: KILL_SWITCH_AUDIT_FINGERPRINT_KID
+          value: "kid_202602"    # Update on pepper rotation: kid_YYYYMM
+
+        # Phase 6.1: PayPal environment selector (non-secret)
+        # sandbox = https://api-m.sandbox.paypal.com | live = https://api-m.paypal.com
+        - name: PAYPAL_ENV
+          value: "sandbox"       # Override in production overlay: live
+
+        # Phase 6.1: Billing preflight config
+        - name: DPP_BILLING_PREFLIGHT_REQUIRED
+          value: "1"
+        - name: DPP_BILLING_PREFLIGHT_TIMEOUT_SECONDS
+          value: "5"
+
+=======================================================================
+SECRETS INJECTION FLOW SUMMARY
+=======================================================================
+
+  AWS Secrets Manager
+       |
+       | (ASCP pull at pod startup via CSI volume mount)
+       v
+  SecretProviderClass "dpp-secrets-aws"
+       |  jmesPath extraction from SM JSON blob
+       |  → paypal_client_id      → alias paypal-client-id
+       |  → paypal_client_secret  → alias paypal-client-secret
+       |  → paypal_webhook_id     → alias paypal-webhook-id
+       |  → toss_secret_key       → alias toss-secret-key
+       |  → toss_webhook_secret   → alias toss-webhook-secret
+       |  → ks_audit_fingerprint_pepper_b64 → alias ks-audit-fingerprint-pepper-b64
+       v
+  K8s Secret "dpp-secrets" (auto-created/synced by ASCP)
+       |
+       | secretKeyRef in api-deployment.yaml
+       v
+  Container env vars
+       PAYPAL_CLIENT_ID=<value from SM>
+       PAYPAL_CLIENT_SECRET=<value from SM>
+       PAYPAL_WEBHOOK_ID=<value from SM>
+       TOSS_SECRET_KEY=<value from SM>
+       TOSS_WEBHOOK_SECRET=<value from SM>  [optional]
+       KILL_SWITCH_AUDIT_FINGERPRINT_PEPPER_B64=<value from SM>

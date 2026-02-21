@@ -1,0 +1,58 @@
+Phase 6.2 — Test Execution Log
+================================
+Date    : 2026-02-21
+Command : cd dpp/apps/api && python -m pytest tests/test_phase6_2_breakglass_templates.py -v
+Platform: win32, Python 3.14.3, pytest-9.0.2
+
+============================= test session starts =============================
+platform win32 -- Python 3.14.3, pytest-9.0.2, pluggy-1.6.0
+asyncio: mode=Mode.AUTO
+plugins: anyio-4.12.1, asyncio-1.3.0, cov-7.0.0
+collected 8 items
+
+tests/test_phase6_2_breakglass_templates.py::test_t1_rule_json_is_valid PASSED     [ 12%]
+tests/test_phase6_2_breakglass_templates.py::test_t2_target_json_is_valid PASSED   [ 25%]
+tests/test_phase6_2_breakglass_templates.py::test_t3_input_paths_map_has_who_where_what PASSED [ 37%]
+tests/test_phase6_2_breakglass_templates.py::test_t4_input_template_has_all_placeholders PASSED [ 50%]
+tests/test_phase6_2_breakglass_templates.py::test_t5_rule_covers_required_event_names PASSED   [ 62%]
+tests/test_phase6_2_breakglass_templates.py::test_t6_rule_covers_both_bypass_patterns PASSED   [ 75%]
+tests/test_phase6_2_breakglass_templates.py::test_t7_sample_event_has_cloudtrail_structure PASSED [ 87%]
+tests/test_phase6_2_breakglass_templates.py::test_t8_no_real_account_ids_in_infra_files PASSED [100%]
+
+======================== 8 passed, 2 warnings in 0.91s ========================
+
+-------- Test Descriptions --------
+
+T1 test_t1_rule_json_is_valid
+   kill_switch_audit_breakglass_rule_v1.json parses as valid JSON dict.
+
+T2 test_t2_target_json_is_valid
+   kill_switch_audit_breakglass_target_v1.json parses as valid JSON list with >=1 target.
+
+T3 test_t3_input_paths_map_has_who_where_what
+   InputPathsMap contains:
+   - "arn" → path includes "userIdentity" (WHO)
+   - "ip"  → path includes "sourceIPAddress" (WHERE)
+   - "req" → path includes "requestParameters" (WHAT)
+
+T4 test_t4_input_template_has_all_placeholders
+   InputTemplate string contains <arn>, <ip>, <req> placeholders.
+
+T5 test_t5_rule_covers_required_event_names
+   Rule JSON string includes: PutObjectRetention, DeleteObject, DeleteObjectVersion.
+
+T6 test_t6_rule_covers_both_bypass_patterns
+   Rule JSON string includes:
+   - "x-amz-bypass-governance-retention" (Pattern A — HTTP header)
+   - "bypassGovernanceRetention" (Pattern B — SDK boolean)
+
+T7 test_t7_sample_event_has_cloudtrail_structure
+   cloudtrail_s3_breakglass_sample_event_v1.json has:
+   Source="aws.s3", DetailType, Detail with userIdentity/sourceIPAddress/requestParameters
+   and x-amz-bypass-governance-retention in requestParameters.
+
+T8 test_t8_no_real_account_ids_in_infra_files
+   eventbridge/ and samples/ directories contain no 12-digit AWS account IDs.
+   (Note: irsa_minimal_sqs_access.json was fixed separately as P0-2 fix.)
+
+-------- All static — zero AWS API calls --------

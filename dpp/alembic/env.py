@@ -1,6 +1,10 @@
 """Alembic environment configuration.
 
-Spec Lock: URL injection from environment (DATABASE_URL_MIGRATIONS -> DATABASE_URL).
+Spec Lock:
+  - URL resolution: DATABASE_URL_MIGRATIONS > DATABASE_URL > alembic.ini
+  - Online migration uses build_engine() — inherits full SSL SSOT policy
+    (verify-full in PROD, sslrootcert from DPP_DB_SSLROOTCERT, NullPool default).
+  - No separate ssl injection needed here; ssl_policy handles it via build_engine().
 """
 
 import os
@@ -9,27 +13,25 @@ from logging.config import fileConfig
 from pathlib import Path
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import pool
 
-# Add apps/api to path
+# Add apps/api to path so dpp_api imports resolve.
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "api"))
 
+from dpp_api.db.engine import build_engine  # noqa: E402
 from dpp_api.db.models import Base  # noqa: E402
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
+# Alembic Config object — provides access to values in the .ini file.
 config = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
+# Set up logging from the alembic.ini config file.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
+# Target metadata for autogenerate support.
 target_metadata = Base.metadata
 
-# Spec Lock: Inject DATABASE_URL from environment
+# Spec Lock: Inject DATABASE_URL from environment.
 # Priority: DATABASE_URL_MIGRATIONS (migration-specific) > DATABASE_URL (runtime) > alembic.ini
 database_url = (
     os.getenv("DATABASE_URL_MIGRATIONS")
@@ -44,21 +46,17 @@ if not database_url:
         "or configure sqlalchemy.url in alembic.ini."
     )
 
-# Inject URL into config for engine_from_config()
+# Expose the resolved URL to alembic.ini (used by offline mode and Alembic internals).
+# SSL policy is applied inside build_engine() for the online path; offline mode
+# generates SQL without connecting, so SSL is not enforced there.
 config.set_main_option("sqlalchemy.url", database_url)
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode.
+    """Run migrations in 'offline' mode (SQL generation, no DB connection).
 
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-
+    Configures the context with a URL and emits SQL to stdout/file.
+    SSL is not enforced in offline mode (no actual connection is made).
     """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -73,17 +71,18 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
+    """Run migrations in 'online' mode (direct DB connection).
 
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
+    Uses build_engine() as the SSOT engine builder so that:
+      - SSL policy (verify-full in PROD + sslrootcert) is automatically applied.
+      - NullPool is used by default (DPP Spec Lock for Supabase pooler).
+      - Production guardrails (port 6543, pooler host, ACK vars) are enforced.
 
+    Raises:
+        RuntimeError: Production guardrail failure (SSL, port, pooler, ACK checks).
+        ValueError: DATABASE_URL not resolvable.
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    connectable = build_engine(database_url)
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)

@@ -1,0 +1,32 @@
+{
+  "_comment": "EventBridge Rule: Kill-Switch Audit WORM Governance Bypass Detection (Phase 6.2)",
+  "_placeholders": {
+    "AUDIT_BUCKET_NAME_PLACEHOLDER": "Replace with actual S3 audit bucket name (e.g. dpp-kill-switch-audit-prod)",
+    "note": "This file is applied via setup script p6_2_setup_breakglass_alerts.sh using jq substitution"
+  },
+  "source": ["aws.s3"],
+  "detail-type": ["AWS API Call via CloudTrail"],
+  "detail": {
+    "eventSource": ["s3.amazonaws.com"],
+    "eventName": [
+      "PutObjectRetention",
+      "DeleteObject",
+      "DeleteObjectVersion",
+      "PutObjectLegalHold"
+    ],
+    "$or": [
+      {
+        "requestParameters": {
+          "bucketName": ["AUDIT_BUCKET_NAME_PLACEHOLDER"],
+          "x-amz-bypass-governance-retention": ["true"]
+        }
+      },
+      {
+        "requestParameters": {
+          "bucketName": ["AUDIT_BUCKET_NAME_PLACEHOLDER"],
+          "bypassGovernanceRetention": [true]
+        }
+      }
+    ]
+  }
+}

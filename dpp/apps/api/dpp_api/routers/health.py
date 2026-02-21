@@ -11,6 +11,7 @@ from fastapi import APIRouter, Response, status
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from dpp_api.billing.active_preflight import get_billing_preflight_status
 from dpp_api.config.env import get_s3_result_bucket, is_irsa_environment, is_localstack_endpoint
 from dpp_api.db.redis_client import RedisClient
 from dpp_api.db.session import engine
@@ -165,12 +166,23 @@ async def readiness_check(response: Response) -> HealthResponse:
     Returns 503 if any dependency is down.
     """
     # P1-J: Check all critical dependencies
+    # P6.1: billing_secrets reads cached preflight result — NO network call
+    billing_cache = get_billing_preflight_status()
+    if "status" in billing_cache and billing_cache["status"] == "skipped":
+        billing_status = "skipped"
+    elif all(v == "ok" for v in billing_cache.values()):
+        billing_status = "up"
+    else:
+        failed = [f"{k}:{v}" for k, v in billing_cache.items() if v != "ok"]
+        billing_status = "down: " + ", ".join(failed)
+
     services = {
         "api": "up",
         "database": check_database(),
         "redis": check_redis(),
         "s3": check_s3(),
         "sqs": check_sqs(),
+        "billing_secrets": billing_status,
     }
 
     # If any service is down, return 503

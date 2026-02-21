@@ -1,0 +1,50 @@
+Phase 6.2 — WORM Break-glass Alerts WHO/WHERE/WHAT Hardening
+============================================================
+Date    : 2026-02-21
+Branch  : phase6-preflight
+Scope   : DPP v0.4.2.2 Pilot deployment hardening — Phase 6.2 only
+
+Purpose
+-------
+Complete the WORM governance bypass detection pipeline so that:
+A) EventBridge → SNS alert email body contains WHO/WHERE/WHAT 3 elements
+   (injected via InputTransformer — no console login needed for 1st triage)
+B) Event pattern covers both bypass representations (Pattern A HTTP header + Pattern B SDK bool)
+C) Setup is idempotent and automated (single script, re-run safe)
+D) CloudTrail Data Events confirmed WriteOnly on audit bucket
+E) Simulation test procedure documented for rehearsal without real break-glass events
+F) Templates validated by static pytest (8 tests) — catches structural regressions in CI
+
+In-scope (6.2 only)
+-------------------
+- dpp/ops/runbooks/kill_switch_audit_break_glass_alerts.md  — full rewrite (WHO/WHERE/WHAT)
+- dpp/infra/eventbridge/kill_switch_audit_breakglass_rule_v1.json   — NEW: event pattern
+- dpp/infra/eventbridge/kill_switch_audit_breakglass_target_v1.json — NEW: SNS + InputTransformer
+- dpp/infra/samples/cloudtrail_s3_breakglass_sample_event_v1.json   — NEW: simulation event
+- dpp/infra/scripts/p6_2_setup_breakglass_alerts.sh                 — NEW: idempotent setup
+- dpp/apps/api/tests/test_phase6_2_breakglass_templates.py           — NEW: 8 static tests
+- dpp/infra/policies/irsa_minimal_sqs_access.json                   — FIX: P0-2 account ID → placeholder
+- dpp/evidence/phase6_2_worm_break_glass_alerts/                     — NEW: this evidence folder
+
+Out-of-scope (intentionally deferred)
+--------------------------------------
+- Phase 6.3: Webhook concurrency test (5 simultaneous, 1 DB commit)
+- Phase 6.4: Cutover runbook + WORM evidence upload
+- Actual AWS resource creation (operator responsibility — done via setup script)
+- Production SCP to deny BypassGovernanceRetention from non-break-glass roles
+
+Non-negotiables enforced
+------------------------
+- Email body MUST contain WHO (actor_arn) / WHERE (source_ip) / WHAT (request_parameters)
+- Event pattern covers Pattern A (x-amz-bypass-governance-retention) AND Pattern B (bypassGovernanceRetention)
+- No secrets / real account IDs committed to any file (only PLACEHOLDER values)
+- Static tests catch template structural regressions in CI without AWS calls
+- Setup script is idempotent (SNS create-topic, EventBridge put-rule, put-targets all idempotent)
+
+Acceptance Criteria
+-------------------
+AC1: Alert email body contains WHO/WHERE/WHAT 3 elements via InputTransformer
+AC2: CloudTrail Data Events setup verified WriteOnly on audit bucket (runbook + CLI)
+AC3: Setup script idempotent — re-run safe, drift updated
+AC4: No secrets in any committed file (PLACEHOLDER only)
+AC5: Static tests (8) catch template regressions in CI

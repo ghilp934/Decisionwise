@@ -1,0 +1,29 @@
+Phase 6.2 — Files Changed (NEW or MODIFIED for this phase)
+===========================================================
+
+NEW (Phase 6.2 additions):
+  dpp/infra/eventbridge/kill_switch_audit_breakglass_rule_v1.json
+    → EventBridge event pattern: both bypass patterns (Pattern A+B), 4 EventNames, bucket-scoped
+
+  dpp/infra/eventbridge/kill_switch_audit_breakglass_target_v1.json
+    → SNS target + InputTransformer: WHO (arn) / WHERE (ip) / WHAT (req) + 4 more fields
+
+  dpp/infra/samples/cloudtrail_s3_breakglass_sample_event_v1.json
+    → Simulation test event for `aws events put-events` rehearsal
+
+  dpp/infra/scripts/p6_2_setup_breakglass_alerts.sh
+    → Idempotent setup script: SNS + EventBridge rule/target + CloudTrail data events
+
+  dpp/apps/api/tests/test_phase6_2_breakglass_templates.py
+    → 8 static tests (JSON parse, InputTransformer fields, bypass patterns, no-secrets)
+
+  dpp/evidence/phase6_2_worm_break_glass_alerts/ (this folder)
+
+MODIFIED (Phase 6.2 changes):
+  dpp/ops/runbooks/kill_switch_audit_break_glass_alerts.md
+    → Full rewrite: WHO/WHERE/WHAT emphasis, InputTransformer setup steps,
+      simulation test procedure, both bypass patterns documented,
+      CloudTrail changed to WriteOnly
+
+  dpp/infra/policies/irsa_minimal_sqs_access.json
+    → P0-2 FIX: real account ID 783268398937 → ACCOUNT_ID_PLACEHOLDER (2 occurrences)

@@ -1,0 +1,58 @@
+{
+  "_comment": "Simulation event for aws events put-events to test EventBridge rule (Phase 6.2). Replace all PLACEHOLDER values before running.",
+  "_placeholders": {
+    "ACCOUNT_ID_PLACEHOLDER": "12-digit AWS account ID",
+    "AUDIT_BUCKET_NAME_PLACEHOLDER": "S3 audit bucket name",
+    "note": "Use with setup script put-events command or run manually for simulation test"
+  },
+  "Source": "aws.s3",
+  "DetailType": "AWS API Call via CloudTrail",
+  "EventBusName": "default",
+  "Detail": {
+    "eventVersion": "1.08",
+    "eventSource": "s3.amazonaws.com",
+    "eventName": "DeleteObject",
+    "eventTime": "2026-02-21T00:00:00Z",
+    "awsRegion": "ap-northeast-2",
+    "sourceIPAddress": "203.0.113.1",
+    "userAgent": "aws-cli/2.x Python/3.x",
+    "userIdentity": {
+      "type": "AssumedRole",
+      "principalId": "EXAMPLE_PRINCIPAL:break-glass-operator",
+      "arn": "arn:aws:sts::ACCOUNT_ID_PLACEHOLDER:assumed-role/dpp-break-glass-role/break-glass-operator",
+      "accountId": "ACCOUNT_ID_PLACEHOLDER",
+      "sessionContext": {
+        "sessionIssuer": {
+          "type": "Role",
+          "principalId": "EXAMPLE_PRINCIPAL",
+          "arn": "arn:aws:iam::ACCOUNT_ID_PLACEHOLDER:role/dpp-break-glass-role",
+          "accountId": "ACCOUNT_ID_PLACEHOLDER",
+          "userName": "dpp-break-glass-role"
+        },
+        "attributes": {
+          "mfaAuthenticated": "true",
+          "creationDate": "2026-02-21T00:00:00Z"
+        }
+      }
+    },
+    "requestParameters": {
+      "bucketName": "AUDIT_BUCKET_NAME_PLACEHOLDER",
+      "key": "kill-switch/2026/02/21/audit-record-test.json",
+      "x-amz-bypass-governance-retention": "true"
+    },
+    "responseElements": null,
+    "resources": [
+      {
+        "ARN": "arn:aws:s3:::AUDIT_BUCKET_NAME_PLACEHOLDER/kill-switch/2026/02/21/audit-record-test.json",
+        "accountId": "ACCOUNT_ID_PLACEHOLDER",
+        "type": "AWS::S3::Object"
+      }
+    ],
+    "requestID": "EXAMPLE_REQUEST_ID",
+    "eventID": "EXAMPLE_EVENT_ID",
+    "eventType": "AwsApiCall",
+    "managementEvent": false,
+    "recipientAccountId": "ACCOUNT_ID_PLACEHOLDER",
+    "eventCategory": "Data"
+  }
+}

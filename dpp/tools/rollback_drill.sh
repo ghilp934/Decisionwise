@@ -29,6 +29,12 @@ STAGING_BASE_URL="${STAGING_BASE_URL:-}"
 # Optional input
 ROLLBACK_REVISION="${ROLLBACK_REVISION:-}"  # Empty = rollback to previous (n-1)
 
+# Phase 4.5: DB drill flag (opt-in)
+DPP_INCLUDE_DB_DRILL="${DPP_INCLUDE_DB_DRILL:-}"
+
+# Phase 4.5: evidence root (overridable; default = phase4_5 folder)
+PHASE_EVIDENCE_DIR="${PHASE_EVIDENCE_DIR:-$REPO_ROOT/evidence/phase4_5_rollback_drill}"
+
 # Create evidence directories
 mkdir -p "$ROLLBACK_DIR" "$SMOKE_DIR" "$DUMP_DIR"
 
@@ -290,6 +296,46 @@ fi
 echo "✓ Post-rollback smoke tests PASSED"
 echo ""
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 4.5: DB Rollback Drill (opt-in via DPP_INCLUDE_DB_DRILL=1)
+# ─────────────────────────────────────────────────────────────────────────────
+DB_MIGRATIONS_JSON="null"
+
+if [[ "${DPP_INCLUDE_DB_DRILL}" == "1" ]]; then
+  echo -e "${YELLOW}[Phase 4.5] DB Rollback Drill 시작 (DPP_INCLUDE_DB_DRILL=1)...${NC}"
+
+  DB_DRILL_SCRIPT="$SCRIPT_DIR/db_rollback_drill.sh"
+  if [[ ! -f "$DB_DRILL_SCRIPT" ]]; then
+    echo -e "${RED}ERROR: db_rollback_drill.sh 를 찾을 수 없습니다: $DB_DRILL_SCRIPT${NC}"
+    exit 1
+  fi
+
+  export PHASE_EVIDENCE_DIR="$PHASE_EVIDENCE_DIR"
+
+  DB_DRILL_START=$(date +%s)
+  bash "$DB_DRILL_SCRIPT"
+  DB_DRILL_RC=$?
+  DB_DRILL_END=$(date +%s)
+  DB_DRILL_DURATION=$((DB_DRILL_END - DB_DRILL_START))
+
+  if [[ $DB_DRILL_RC -ne 0 ]]; then
+    echo -e "${RED}ERROR: DB Rollback Drill 실패 (exit=$DB_DRILL_RC)${NC}"
+    exit "$DB_DRILL_RC"
+  fi
+
+  # manifest_db_migrations.json에서 db_migrations 섹션 읽기
+  DB_MIG_MANIFEST="$PHASE_EVIDENCE_DIR/02_db_migrations/manifest_db_migrations.json"
+  if [[ -f "$DB_MIG_MANIFEST" ]]; then
+    DB_MIGRATIONS_JSON="$(cat "$DB_MIG_MANIFEST")"
+  fi
+
+  echo -e "${GREEN}✓ DB Rollback Drill 완료 (${DB_DRILL_DURATION}s)${NC}"
+  echo ""
+else
+  echo "(DPP_INCLUDE_DB_DRILL 미설정 — DB drill 건너뜀. 활성화: export DPP_INCLUDE_DB_DRILL=1)"
+  echo ""
+fi
+
 # Generate/Update Manifest
 echo "Updating manifest..."
 
@@ -306,8 +352,11 @@ if [ -f "$MANIFEST_FILE" ]; then
      --argjson rollback_duration "$ROLLBACK_DURATION" \
      --argjson checks_passed "$CHECKS_PASSED" \
      --argjson checks_total "$CHECKS_TOTAL" \
+     --argjson db_migrations "${DB_MIGRATIONS_JSON}" \
      '.rollback = {"ok": true, "method": $rollback_method, "duration_sec": $rollback_duration} |
-      .smoke.post_rollback = {"ok": ($checks_passed == $checks_total), "checks_passed": $checks_passed, "checks_total": $checks_total}' \
+      .smoke.post_rollback = {"ok": ($checks_passed == $checks_total), "checks_passed": $checks_passed, "checks_total": $checks_total} |
+      .db_migrations = $db_migrations |
+      .db_recovery = null' \
      "$MANIFEST_FILE" > "${MANIFEST_FILE}.tmp" && mv "${MANIFEST_FILE}.tmp" "$MANIFEST_FILE"
 else
   # Create new manifest (rollback-only)
@@ -341,8 +390,11 @@ else
     "method": "kubectl rollout undo",
     "duration_sec": $ROLLBACK_DURATION
   },
+  "db_migrations": ${DB_MIGRATIONS_JSON},
+  "db_recovery": null,
   "artifacts": {
-    "evidence_dir": "$EVIDENCE_DIR"
+    "evidence_dir": "$EVIDENCE_DIR",
+    "phase4_5_dir": "$PHASE_EVIDENCE_DIR"
   }
 }
 EOF

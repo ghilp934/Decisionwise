@@ -1,0 +1,64 @@
+Phase 6.2 — Git Diff Stat (HEAD, Phase 6.2 modified files)
+===========================================================
+Date    : 2026-02-21
+Branch  : phase6-preflight
+Command : git diff --stat HEAD -- <phase6.2 modified files>
+
+-------- MODIFIED FILES (tracked) --------
+
+ dpp/infra/policies/irsa_minimal_sqs_access.json |  4 ++--    (P0-2 fix: account ID → placeholder)
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+Note: kill_switch_audit_break_glass_alerts.md is untracked (not yet committed) —
+      it was previously committed in an earlier phase but modified in P6.2.
+
+-------- NEW FILES (untracked → will be committed) --------
+
+ dpp/infra/eventbridge/kill_switch_audit_breakglass_rule_v1.json
+ dpp/infra/eventbridge/kill_switch_audit_breakglass_target_v1.json
+ dpp/infra/samples/cloudtrail_s3_breakglass_sample_event_v1.json
+ dpp/infra/scripts/p6_2_setup_breakglass_alerts.sh
+ dpp/apps/api/tests/test_phase6_2_breakglass_templates.py
+ dpp/evidence/phase6_2_worm_break_glass_alerts/ (this folder)
+
+-------- KEY CHANGES BY FILE --------
+
+kill_switch_audit_break_glass_alerts.md (runbook rewrite):
+  - Added: WHO/WHERE/WHAT section header with table (3 CloudTrail paths)
+  - Added: Alert Architecture diagram updated with InputTransformer step
+  - Added: Setup §3 (EventBridge rule with $or bypass pattern)
+  - Added: Setup §4 (InputTransformer — full InputPathsMap + InputTemplate example)
+  - Added: Setup §5 (Simulation test with put-events procedure)
+  - Changed: CloudTrail ReadWriteType "All" → "WriteOnly"
+  - Changed: Rule pattern to cover both Pattern A + Pattern B bypass
+  - Changed: EventName list to include PutObjectRetention, DeleteObjectVersion, PutObjectLegalHold
+
+kill_switch_audit_breakglass_rule_v1.json (NEW):
+  - source: ["aws.s3"]
+  - detail-type: ["AWS API Call via CloudTrail"]
+  - eventName: [PutObjectRetention, DeleteObject, DeleteObjectVersion, PutObjectLegalHold]
+  - $or: Pattern A (x-amz-bypass-governance-retention) + Pattern B (bypassGovernanceRetention)
+  - Both branches include bucketName filter for audit bucket scope
+
+kill_switch_audit_breakglass_target_v1.json (NEW):
+  - InputPathsMap: arn, ip, req, event, time, region, account
+  - InputTemplate: 7-field multiline email body with WHO/WHERE/WHAT sections
+  - Arn: TOPIC_ARN_PLACEHOLDER (substituted by setup script)
+
+cloudtrail_s3_breakglass_sample_event_v1.json (NEW):
+  - Source: "aws.s3", DetailType: "AWS API Call via CloudTrail"
+  - Detail includes: userIdentity.arn, sourceIPAddress, requestParameters
+  - requestParameters.x-amz-bypass-governance-retention: "true"
+  - All ARNs/account IDs use PLACEHOLDER values
+
+p6_2_setup_breakglass_alerts.sh (NEW):
+  - Step 1: SNS create-topic (idempotent)
+  - Step 2: SNS subscribe email (check-before-create)
+  - Step 3: SNS topic policy for EventBridge publish
+  - Step 4: EventBridge put-rule (jq substitution of bucket name)
+  - Step 5: EventBridge put-targets with InputTransformer
+  - Step 6: CloudTrail data events (WriteOnly, check-before-enable)
+
+irsa_minimal_sqs_access.json:
+  - "arn:aws:sqs:ap-northeast-2:783268398937:..." → ACCOUNT_ID_PLACEHOLDER (2 occurrences)
+  - P0-2 compliance fix: real account ID removed from committed file

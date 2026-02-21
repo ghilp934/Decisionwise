@@ -1,0 +1,38 @@
+Phase 6.1 — Secrets Active Injection + Fail-Fast + Boot Healthcheck
+====================================================================
+Date       : 2026-02-21
+Branch     : phase6-preflight
+Scope      : DPP v0.4.2.2 Pilot deployment hardening — Phase 6.1 only
+
+Purpose
+-------
+A) K8s secret injection: PayPal, Toss, HMAC pepper → ASCP → dpp-secrets Secret → env
+B) Kill-switch fingerprint (kid/pepper) validated at boot → Fail-closed if misconfigured
+C) PayPal OAuth + Toss auth active preflight at startup (1 call each, result cached)
+D) /readyz exposes cached billing_secrets status without extra network calls
+
+In-scope (6.1 only)
+-------------------
+- dpp/apps/api/dpp_api/audit/kill_switch_audit.py   — add validate_kill_switch_audit_fingerprint_config()
+- dpp/apps/api/dpp_api/billing/active_preflight.py  — NEW module (PayPal + Toss checks)
+- dpp/apps/api/dpp_api/main.py                      — startup_event: fingerprint + billing preflight
+- dpp/apps/api/dpp_api/routers/health.py            — readyz: cached billing_secrets status
+- dpp/k8s/secretproviderclass-dpp-secrets.yaml      — 6 new jmesPath entries
+- dpp/k8s/api-deployment.yaml                       — env vars: secrets + config
+- dpp/apps/api/tests/test_phase6_1_billing_secret_preflight.py — 5 tests
+- dpp/docs/P0-2_IMPLEMENTATION_SUMMARY.md           — env var section expanded
+
+Out-of-scope (intentionally deferred)
+--------------------------------------
+- Phase 6.2: EventBridge Input Transformer break-glass alerting
+- Phase 6.3: Webhook concurrency test (5 simultaneous, 1 DB commit)
+- Phase 6.4: Cutover runbook + WORM evidence upload
+- Webhook processing semantics changes (Phase 6.3 boundary)
+- Production SSO token refresh (operator responsibility)
+
+Non-negotiables enforced
+------------------------
+- No secret values in any committed file (only placeholders)
+- No network calls in /health or /readyz (billing_secrets = cached from startup)
+- External calls happen ONCE at startup; idempotent guard in run_billing_secrets_active_preflight()
+- DPP_BILLING_PREFLIGHT_REQUIRED=1 → any failure raises RuntimeError → pod CrashLoops

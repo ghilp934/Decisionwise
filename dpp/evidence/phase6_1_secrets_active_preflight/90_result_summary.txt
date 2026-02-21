@@ -1,0 +1,124 @@
+Phase 6.1 — Result Summary & Acceptance Criteria
+==================================================
+Date    : 2026-02-21
+Branch  : phase6-preflight
+Version : DPP v0.4.2.2
+Verdict : PASS — All 6 Acceptance Criteria met
+
+=======================================================================
+ACCEPTANCE CRITERIA CHECKLIST
+=======================================================================
+
+AC1: K8s secrets injection
+     Status: PASS
+     Evidence: 40_k8s_manifest_snippets.txt
+     Details:
+       - SecretProviderClass updated with 6 new jmesPath entries
+       - api-deployment.yaml updated with 6 new secretKeyRef env vars
+       - Secret flow: AWS SM -> ASCP -> dpp-secrets K8s Secret -> env vars
+       - TOSS_WEBHOOK_SECRET marked optional: true (signature verification)
+       - KILL_SWITCH_AUDIT_FINGERPRINT_PEPPER_B64 injected from SM
+
+AC2: Boot-time fingerprint validation (Fail-closed)
+     Status: PASS
+     Evidence: 30_pytest.txt (T4, T5)
+     Details:
+       - validate_kill_switch_audit_fingerprint_config() added to kill_switch_audit.py
+       - Called in startup_event when KILL_SWITCH_AUDIT_REQUIRED=1 OR STRICT=1
+       - T4: Invalid base64 pepper → exception raised at boot → pod CrashLoop
+       - T5: Missing pepper with REQUIRED=1 → RuntimeError("FINGERPRINT_PEPPER_NOT_SET")
+       - Fail-closed: boot aborts, pod does NOT enter RUNNING state
+
+AC3: PayPal OAuth active preflight (1 call at startup, cached)
+     Status: PASS
+     Evidence: 30_pytest.txt (T1, T2)
+     Details:
+       - _check_paypal(): POST {PAYPAL_BASE_URL}/v1/oauth2/token with Basic Auth
+       - 200 + access_token in body → "ok" (token value never logged)
+       - Non-200 → "err:HTTP_{code}" → RuntimeError if REQUIRED=1
+       - T1: PayPal 401 → RuntimeError("BILLING_SECRET_PREFLIGHT_FAILED:paypal:...")
+       - Idempotent: run_billing_secrets_active_preflight() returns early if already cached
+
+AC4: Toss auth sanity check (1 call at startup, cached)
+     Status: PASS
+     Evidence: 30_pytest.txt (T2, T3)
+     Details:
+       - _check_toss(): GET /v1/payments/orders/{dpp_preflight_{uuid4().hex}}
+       - probe_id is synthetic (guaranteed non-existent order)
+       - 400/404 → "ok" (auth accepted; order-not-found is expected)
+       - 401/403 → "err:AUTH_FAILED:HTTP_{code}" → RuntimeError if REQUIRED=1
+       - T2: Toss 401 → RuntimeError("BILLING_SECRET_PREFLIGHT_FAILED:toss:AUTH_FAILED:HTTP_401")
+       - T3: Toss 404 → result "ok" (PASS, auth was accepted)
+
+AC5: /readyz exposes cached billing_secrets status (no network call)
+     Status: PASS
+     Evidence: health.py modification
+     Details:
+       - get_billing_preflight_status() reads _preflight_result module-level cache
+       - No async, no network call — pure dict read
+       - billing_status computed: "skipped" | "up" | "down: {provider}:{err}"
+       - Added to services dict: "billing_secrets": billing_status
+       - /health probe and /readyz probe never trigger billing network activity
+
+AC6: No secrets committed (placeholder values only)
+     Status: PASS
+     Evidence: This file + P0-2_IMPLEMENTATION_SUMMARY.md + all YAML files
+     Details:
+       - All YAML: values are "<placeholder>" or literal config (not secrets)
+       - KILL_SWITCH_AUDIT_BUCKET: "<REPLACE_WITH_WORM_BUCKET_NAME>" (placeholder)
+       - PAYPAL_ENV: "sandbox" (non-secret, public info)
+       - No actual client_id, client_secret, webhook_id, secret_key values in any committed file
+       - P0-2_IMPLEMENTATION_SUMMARY.md: all secrets shown as <placeholder>
+
+=======================================================================
+TEST RESULTS SUMMARY
+=======================================================================
+
+Phase 6.1 Specific Tests:
+  T1 PayPal 401 -> RuntimeError(REQUIRED=1)   PASS
+  T2 Toss 401   -> RuntimeError(REQUIRED=1)   PASS
+  T3 Toss 404   -> "ok" (auth accepted)        PASS
+  T4 Invalid pepper_b64 -> raises at boot      PASS
+  T5 Missing pepper (REQUIRED=1) -> raises     PASS
+  Total: 5/5 PASSED (0.87s)
+
+All mocked — zero real network calls to paypal.com or tosspayments.com.
+
+=======================================================================
+CHANGED FILES SUMMARY
+=======================================================================
+
+NEW:
+  dpp/apps/api/dpp_api/billing/active_preflight.py
+  dpp/apps/api/tests/test_phase6_1_billing_secret_preflight.py
+  dpp/evidence/phase6_1_secrets_active_preflight/ (this folder)
+
+MODIFIED:
+  dpp/apps/api/dpp_api/audit/kill_switch_audit.py
+    -> Added validate_kill_switch_audit_fingerprint_config()
+  dpp/apps/api/dpp_api/main.py
+    -> startup_event: fingerprint validation + billing preflight call
+  dpp/apps/api/dpp_api/routers/health.py
+    -> readyz: billing_secrets cached status (no network call)
+  dpp/k8s/secretproviderclass-dpp-secrets.yaml
+    -> 6 new jmesPath entries + 6 secretObjects.data entries
+  dpp/k8s/api-deployment.yaml
+    -> 6 secretKeyRef env vars + 8 non-secret config env vars
+  dpp/docs/P0-2_IMPLEMENTATION_SUMMARY.md
+    -> Env var section updated with P6.1 additions
+
+=======================================================================
+NON-NEGOTIABLES VERIFIED
+=======================================================================
+
+[x] No secret values in any committed file (only placeholders)
+[x] No network calls in /health or /readyz (billing_secrets = cached)
+[x] External calls happen ONCE at startup; idempotent guard implemented
+[x] DPP_BILLING_PREFLIGHT_REQUIRED=1 -> failure raises RuntimeError -> pod CrashLoops
+[x] KILL_SWITCH_AUDIT_REQUIRED=1 + bad pepper -> boot failure (Fail-closed)
+[x] All 5 tests use monkeypatching — no real paypal.com / tosspayments.com calls
+
+=======================================================================
+PHASE 6.1: COMPLETE
+Next: Phase 6.2 (EventBridge break-glass alerting)
+=======================================================================
