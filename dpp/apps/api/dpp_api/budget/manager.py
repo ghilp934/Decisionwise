@@ -61,7 +61,7 @@ class BudgetManager:
 
     Redis keys:
     - budget:{tenant_id}:balance_usd_micros - Current balance (string int)
-    - reserve:{run_id} - Reservation (hash: tenant_id, reserved_usd_micros, created_at_ms)
+    - reserve:{tenant_id}:{run_id} - Reservation (hash: tenant_id, reserved_usd_micros, created_at_ms)
     """
 
     def __init__(self, redis_client: redis.Redis, db: Session):
@@ -336,7 +336,7 @@ class BudgetManager:
             return None
 
         # Get reservation from Redis (if exists)
-        reservation = self.scripts.get_reservation(run_id)
+        reservation = self.scripts.get_reservation(tenant_id, run_id)
 
         return {
             "money_state": run.money_state,

@@ -11,9 +11,10 @@ import redis
 
 from dpp_api.constants import RESERVATION_TTL_SECONDS
 
-# Key naming conventions (locked spec)
+# Key naming conventions (locked spec — hash tag {tenant_id} forces cluster slot co-location)
 # - budget:{tenant_id}:balance_usd_micros (string int)
-# - reserve:{run_id} (hash: reserved_usd_micros, tenant_id, created_at_ms) TTL=3600s
+# - reserve:{tenant_id}:{run_id} (hash: reserved_usd_micros, tenant_id, created_at_ms) TTL=3600s
+# - settle_receipt:{tenant_id}:{run_id} (hash: MS-6 idempotency receipt) TTL=3600s
 
 
 # Reserve.lua - Atomically reserve budget
@@ -137,13 +138,13 @@ class BudgetScripts:
 
     @staticmethod
     def budget_key(tenant_id: str) -> str:
-        """Generate budget key."""
-        return f"budget:{tenant_id}:balance_usd_micros"
+        """Generate budget key. Hash tag {tenant_id} ensures cluster slot co-location."""
+        return f"budget:{{{tenant_id}}}:balance_usd_micros"
 
     @staticmethod
-    def reserve_key(run_id: str) -> str:
-        """Generate reserve key."""
-        return f"reserve:{run_id}"
+    def reserve_key(tenant_id: str, run_id: str) -> str:
+        """Generate reserve key. Hash tag {tenant_id} co-locates with budget_key."""
+        return f"reserve:{{{tenant_id}}}:{run_id}"
 
     def reserve(
         self, tenant_id: str, run_id: str, reserved_usd_micros: int
@@ -163,7 +164,7 @@ class BudgetScripts:
             - ("ERR_INSUFFICIENT", current_balance) - Insufficient budget
         """
         budget_key = self.budget_key(tenant_id)
-        reserve_key = self.reserve_key(run_id)
+        reserve_key = self.reserve_key(tenant_id, run_id)
         created_at_ms = int(time.time() * 1000)
 
         result = self.redis.evalsha(
@@ -189,9 +190,9 @@ class BudgetScripts:
             return ("ERR_ALREADY_RESERVED", 0)
 
     @staticmethod
-    def receipt_key(run_id: str) -> str:
-        """Generate settlement receipt key (MS-6)."""
-        return f"settle_receipt:{run_id}"
+    def receipt_key(tenant_id: str, run_id: str) -> str:
+        """Generate settlement receipt key (MS-6). Hash tag {tenant_id} co-locates with budget_key."""
+        return f"settle_receipt:{{{tenant_id}}}:{run_id}"
 
     def settle(
         self, tenant_id: str, run_id: str, charge_usd_micros: int
@@ -215,8 +216,8 @@ class BudgetScripts:
             - ("ERR_NO_RESERVE", 0, 0, 0) - No reservation found
         """
         budget_key = self.budget_key(tenant_id)
-        reserve_key = self.reserve_key(run_id)
-        receipt_key = self.receipt_key(run_id)
+        reserve_key = self.reserve_key(tenant_id, run_id)
+        receipt_key = self.receipt_key(tenant_id, run_id)
 
         result = self.redis.evalsha(
             self.settle_sha,
@@ -237,7 +238,7 @@ class BudgetScripts:
             return ("ERR_NO_RESERVE", 0, 0, 0)
 
     def get_settlement_receipt(
-        self, run_id: str
+        self, tenant_id: str, run_id: str
     ) -> Optional[dict[str, str]]:
         """
         Get settlement receipt for a run (MS-6).
@@ -246,6 +247,7 @@ class BudgetScripts:
         Used for idempotent reconciliation when DB commit fails after settlement.
 
         Args:
+            tenant_id: Tenant ID (required for hash-tag key lookup)
             run_id: Run ID
 
         Returns:
@@ -256,7 +258,7 @@ class BudgetScripts:
             - refund_usd_micros: Refund amount (string)
             - settled_at: Unix timestamp (string)
         """
-        receipt_key = self.receipt_key(run_id)
+        receipt_key = self.receipt_key(tenant_id, run_id)
         receipt = self.redis.hgetall(receipt_key)
 
         if not receipt:
@@ -285,7 +287,7 @@ class BudgetScripts:
             - ("ERR_NO_RESERVE", 0, 0) - No reservation found
         """
         budget_key = self.budget_key(tenant_id)
-        reserve_key = self.reserve_key(run_id)
+        reserve_key = self.reserve_key(tenant_id, run_id)
 
         result = self.redis.evalsha(
             self.refund_full_sha,
@@ -355,17 +357,18 @@ class BudgetScripts:
         balance = self.redis.get(initial_key)
         return int(balance) if balance else 0
 
-    def get_reservation(self, run_id: str) -> Optional[dict]:
+    def get_reservation(self, tenant_id: str, run_id: str) -> Optional[dict]:
         """
         Get reservation details.
 
         Args:
+            tenant_id: Tenant ID (required for hash-tag key lookup)
             run_id: Run ID
 
         Returns:
             Reservation dict or None if not found
         """
-        reserve_key = self.reserve_key(run_id)
+        reserve_key = self.reserve_key(tenant_id, run_id)
         data = self.redis.hgetall(reserve_key)
         if not data:
             return None

@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dpp-pilot-params
+data:
+  AWS_ACCOUNT_ID: "783268398937"
+  AWS_REGION: "ap-northeast-2"
+
+  # 이미지 태그 (배포 당일 릴리즈 태그와 동기화)
+  IMAGE_TAG: "0.4.2.2"
+
+  # ECR registry (위 2개로 계산한 값을 "문자열로 확정")
+  ECR_REGISTRY: "783268398937.dkr.ecr.ap-northeast-2.amazonaws.com"
+
+  # Ingress (ALB) — SSOT: sync_pilot_values.sh 로 ingress/configmap 자동 동기화
+  PILOT_HOST: "api-pilot.decisionproof.io.kr"
+  PILOT_APP_HOST: "app-pilot.decisionproof.io.kr"
+  PILOT_ACM_CERT_ARN: "arn:aws:acm:ap-northeast-2:783268398937:certificate/8b0225d0-8ff7-40ea-80fb-2b11167ca77c"
+  PILOT_ALB_SECURITY_GROUP_ID: "sg-09caf889f951e4d02"
+
+  # IRSA role arn (가능하면 기존 role 재사용; 새 role 만들 필요 없게)
+  IRSA_ROLE_ARN_API: "arn:aws:iam::783268398937:role/dpp-api-role"
+  IRSA_ROLE_ARN_WORKER: "arn:aws:iam::783268398937:role/dpp-worker-role"
+  IRSA_ROLE_ARN_REAPER: "arn:aws:iam::783268398937:role/dpp-reaper-role"
+  IRSA_ROLE_ARN_MIGRATOR: "arn:aws:iam::783268398937:role/dpp-api-role"

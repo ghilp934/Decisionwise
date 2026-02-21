@@ -94,3 +94,7 @@ prod-ca-*.pem
 supabase-ca*.crt
 supabase-ca*.cer
 supabase-ca*.pem
+
+# Release evidence artifacts (generated at release time, stored as GitHub release assets)
+# Scripts/templates that generate evidence remain in ops/scripts/ and ops/runbooks/
+ops/evidence/

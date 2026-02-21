@@ -177,7 +177,7 @@ def test_reconciliation_perfect_match(redis_client: redis.Redis, db_session: Ses
     balances = get_redis_balances(budget_scripts, [tenant_id])
 
     # Get reserved amount for this tenant's runs only
-    reservation = budget_scripts.get_reservation(run_id_1)
+    reservation = budget_scripts.get_reservation(tenant_id, run_id_1)
     reserved_for_tenant = reservation["reserved_usd_micros"] if reservation else 0
 
     # Get settled amount for this tenant only
@@ -245,8 +245,8 @@ def test_reconciliation_with_active_reservation(
     balances = get_redis_balances(budget_scripts, [tenant_id])
 
     # Get reserved amount for this tenant's runs only
-    reservation_1 = budget_scripts.get_reservation(run_id_1)  # Should be None (settled)
-    reservation_2 = budget_scripts.get_reservation(run_id_2)  # Should exist
+    reservation_1 = budget_scripts.get_reservation(tenant_id, run_id_1)  # Should be None (settled)
+    reservation_2 = budget_scripts.get_reservation(tenant_id, run_id_2)  # Should exist
     reserved_for_tenant = (
         (reservation_1["reserved_usd_micros"] if reservation_1 else 0) +
         (reservation_2["reserved_usd_micros"] if reservation_2 else 0)
@@ -311,7 +311,7 @@ def test_reconciliation_detects_discrepancy(redis_client: redis.Redis, db_sessio
     balances = get_redis_balances(budget_scripts, [tenant_id])
 
     # Get reserved amount for this tenant's runs only
-    reservation = budget_scripts.get_reservation(run_id)
+    reservation = budget_scripts.get_reservation(tenant_id, run_id)
     reserved_for_tenant = reservation["reserved_usd_micros"] if reservation else 0
 
     # Get settled amount for this tenant only

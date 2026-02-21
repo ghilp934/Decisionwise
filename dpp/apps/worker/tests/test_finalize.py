@@ -97,7 +97,7 @@ def test_finalize_success_winner(
     assert final_run.version == 3  # 1 -> 2 (claim) -> 3 (commit)
 
     # Verify Redis reservation deleted
-    reservation = budget_manager.scripts.get_reservation(run.run_id)
+    reservation = budget_manager.scripts.get_reservation(run.tenant_id, run.run_id)
     assert reservation is None
 
 

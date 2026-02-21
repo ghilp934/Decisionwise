@@ -223,7 +223,7 @@ class TestRC4BillingInvariants:
         assert winner_run_id is not None, "202 response missing run_id"
 
         # TTL check (auditor critical: Zombie reservation prevention)
-        reserve_key = f"reserve:{winner_run_id}"
+        reserve_key = f"reserve:{{{tenant_id}}}:{winner_run_id}"
         ttl = redis_client.ttl(reserve_key)
 
         assert ttl > 0, \

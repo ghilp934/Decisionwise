@@ -72,7 +72,7 @@ def verify_money_conservation(
                 key_str = key
 
             run_id = key_str.replace("reserve:", "")
-            reservation = budget_scripts.get_reservation(run_id)
+            reservation = budget_scripts.get_reservation(tenant_id, run_id)
             if reservation and reservation["tenant_id"] == tenant_id:
                 reserved_total += reservation["reserved_usd_micros"]
 
