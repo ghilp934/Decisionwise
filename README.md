@@ -6,7 +6,11 @@
 [![Money](https://img.shields.io/badge/Money-Zero%20leak%20design-critical)](#money-flow-zero-leak-design)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue)](#license)
 
-Payment-based API platform for **supporting decision-making processes of AI agents** — run multi-step workloads with **spend caps, receipts, and automatic reconciliation**.
+Payment-based API platform for **supporting decision-making processes of AI agents.**
+
+Run multi-step AI workloads — including structured scoring, URL screening, OCR/document extraction, and research workflows — with **spend caps, receipts, and automatic reconciliation**.
+
+Built for teams that need **controlled execution, auditable results, and predictable recovery under retries, timeouts, and worker failures**.
 
 ---
 
@@ -24,11 +28,10 @@ Repository: https://github.com/ghilp934/Decisionproof
 Decisionproof runs *decision packs* (units of work) as **runs** through a distributed pipeline:
 
 1) **API** validates the request, enforces plan/budget limits, and enqueues work.
-2) **Worker** executes the pack from a queue, producing a result artifact.
+2) **Worker** executes the pack from a queue, producing a result artifact. Depending on the pack type, a worker may perform structured scoring, URL screening, OCR/document extraction, or research-oriented processing. The output is stored as a result artifact so downstream systems can review outcomes in a more controlled and auditable way.
 3) **Reaper** continuously reconciles edge cases (stuck runs, lease expiry, partial commits).
 
 The core design goal is to remain **failure-safe** under retries, timeouts, and worker crashes by combining:
-
 - **Idempotency** at the API boundary (per-tenant idempotency key).
 - **Leases + heartbeats** for long-running work.
 - **Receipt-based settlement** where the result store metadata acts as an authoritative proof for reconciliation.
