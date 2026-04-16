@@ -58,7 +58,11 @@ def init_otel(
             "Skipping provider initialization (managed by test fixtures)."
         )
         if log_correlation:
-            LoggingInstrumentor().instrument(set_logging_format=False)
+            # set_logging_format=True is required: with False, the record_factory
+            # contains an early-return guard and never injects otelTraceID/otelSpanID.
+            # logging.basicConfig() called internally is a no-op when root logger
+            # already has handlers (production) or when log_capture replaces them (tests).
+            LoggingInstrumentor().instrument(set_logging_format=True)
             logger.info("OpenTelemetry log correlation enabled (trace_id/span_id injection)")
         return None, None
 
@@ -90,7 +94,7 @@ def init_otel(
 
     # Initialize log correlation (inject trace/span IDs into log records)
     if log_correlation:
-        LoggingInstrumentor().instrument(set_logging_format=False)
+        LoggingInstrumentor().instrument(set_logging_format=True)
         logger.info("OpenTelemetry log correlation enabled (trace_id/span_id injection)")
 
     logger.info(

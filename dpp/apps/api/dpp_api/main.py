@@ -1090,18 +1090,6 @@ def create_app(
         """Test endpoint for RC-7 OTel verification."""
         return {"status": "ok", "test": "ratelimit"}
 
-    # RC-7: Instrument FastAPI app with OTel FIRST (before other middlewares)
-    # This ensures FastAPIInstrumentor wraps all middlewares for proper span closure
-    if otel_enabled:
-        from opentelemetry import metrics, trace
-        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-
-        FastAPIInstrumentor.instrument_app(
-            new_app,
-            tracer_provider=trace.get_tracer_provider(),
-            meter_provider=metrics.get_meter_provider(),
-        )
-
     # Store OTel enabled flag for middleware
     new_app.state.otel_enabled = otel_enabled
 
@@ -1167,7 +1155,7 @@ def create_app(
 
         return response
 
-    # Completion logging middleware (must be innermost for proper span context)
+    # Completion logging middleware — logs trace_id injected by LoggingInstrumentor
     @new_app.middleware("http")
     async def completion_logging_mw(request: Request, call_next):
         """Log HTTP request completion with trace context."""
@@ -1224,7 +1212,7 @@ def create_app(
             plan_key_var.set("")
             budget_decision_var.set("")
 
-    # Request ID middleware (outermost for context propagation)
+    # Request ID middleware
     @new_app.middleware("http")
     async def request_id_mw(request: Request, call_next):
         """Generate and propagate request_id."""
@@ -1233,6 +1221,21 @@ def create_app(
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         return response
+
+    # RC-7: Instrument FastAPI app with OTel LAST (after all custom middlewares).
+    # Starlette builds the middleware stack in reverse registration order, so the
+    # last-added middleware becomes the outermost wrapper.  OpenTelemetryMiddleware
+    # must be outermost so its span is still active when completion_logging_mw's
+    # finally block runs and logs trace_id.
+    if otel_enabled:
+        from opentelemetry import metrics, trace
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+        FastAPIInstrumentor.instrument_app(
+            new_app,
+            tracer_provider=trace.get_tracer_provider(),
+            meter_provider=metrics.get_meter_provider(),
+        )
 
     # Initialize rate limiter
     new_app.state.rate_limiter = NoOpRateLimiter(quota=60, window=60)
