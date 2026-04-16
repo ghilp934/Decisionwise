@@ -21,7 +21,7 @@ from dpp_api.context import budget_decision_var, plan_key_var, request_id_var, r
 from dpp_api.enforce import PlanViolationError
 from dpp_api.utils.sanitize import sanitize_str
 from dpp_api.rate_limiter import NoOpRateLimiter, RateLimiter
-from dpp_api.routers import admin, auth, demo_runs, health, internal, runs, tokens, usage, webhooks
+from dpp_api.routers import admin, auth, billing, health, internal, onboarding, runs, tokens, usage, webhooks
 from dpp_api.schemas import ProblemDetail
 from dpp_api.utils import configure_json_logging
 
@@ -70,8 +70,7 @@ app.add_middleware(
     allow_origins=allowed_origins,  # P1-G: Never "*" with credentials
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explicit methods
-    allow_headers=["Authorization", "Content-Type", "Idempotency-Key",
-                   "X-RapidAPI-Proxy-Secret", "X-RapidAPI-Subscription", "X-RapidAPI-User"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],  # Explicit headers
     expose_headers=[
         "X-DPP-Cost-Reserved", "X-DPP-Cost-Actual", "X-DPP-Cost-Minimum-Fee",  # P1-6
         "RateLimit-Policy", "RateLimit", "Retry-After"  # P0 Hotfix: IETF rate limit headers
@@ -373,7 +372,31 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     P0-1: Preserves dict detail fields for structured error responses (RFC 9457 compliant).
     P0 Hotfix: Adds Retry-After header for 429 responses.
     RC-2: Uses opaque instance identifier and proper domain.
+    Phase 2 patch: If exc.detail is already a RFC 9457 Problem Detail dict
+      (has top-level "type" and "status" keys), pass it through unchanged to prevent
+      double-wrapping. This preserves endpoint-specific type/title/detail from billing
+      and other routers that construct Problem Details directly.
     """
+    headers = {}
+    if exc.status_code == 429:
+        headers["Retry-After"] = "60"
+
+    # Phase 2: Pass-through already-formed RFC 9457 Problem Detail dicts unchanged.
+    # Condition: detail is a dict with "type" and "status" at top level — this is
+    # the canonical signature of a Problem Detail object from _problem() helpers.
+    if (
+        isinstance(exc.detail, dict)
+        and "type" in exc.detail
+        and "status" in exc.detail
+    ):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=exc.detail,
+            media_type="application/problem+json",
+            headers=headers,
+        )
+
+    # Generic path: construct Problem Detail from status code
     # P0-1: Don't force-cast detail to str - preserve dict if provided
     detail_value = exc.detail if exc.detail is not None else _get_title_for_status(exc.status_code)
 
@@ -388,11 +411,6 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         detail=detail_value,
         instance=instance,
     )
-
-    headers = {}
-    # P0 Hotfix: Add Retry-After header for 429 (default to 60 seconds)
-    if exc.status_code == 429:
-        headers["Retry-After"] = "60"
 
     return JSONResponse(
         status_code=exc.status_code,
@@ -500,7 +518,8 @@ app.include_router(internal.router)  # SMTP Smoke Test: Internal endpoints
 app.include_router(admin.router)  # P0-1: Admin endpoints (kill switch)
 app.include_router(webhooks.router)  # P0-2: Billing webhooks (PayPal + Toss)
 app.include_router(tokens.router)  # P0-3: Token lifecycle management
-app.include_router(demo_runs.router)  # Mini Demo: Marketplace 공개 엔드포인트 (hardened)
+app.include_router(billing.router)  # Phase 2: Payment front door (checkout, PayPal, capture)
+app.include_router(onboarding.router)  # Phase 2: Onboarding status
 
 
 # ============================================================================
@@ -666,58 +685,6 @@ async def well_known_openapi():
     Returns: OpenAPI 3.1.0 JSON schema
     """
     return JSONResponse(content=app.openapi())
-
-
-@app.get("/.well-known/openapi-demo.json")
-async def well_known_openapi_demo():
-    """
-    Mini Demo OpenAPI 3.1.0 specification (Marketplace용).
-
-    LOCK:
-    - servers: 길이 1, url = DP_DEMO_PUBLIC_BASE_URL (default: https://api.decisionproof.io.kr)
-    - paths: 오직 /v1/demo/runs, /v1/demo/runs/{run_id} 만 노출
-    - 다른 path가 섞이면 런타임 에러 (FAIL-FAST)
-
-    Returns: OpenAPI 3.1.0 JSON (allowlist 필터 적용)
-    """
-    import copy
-
-    demo_base_url = os.getenv("DP_DEMO_PUBLIC_BASE_URL", "https://api.decisionproof.io.kr")
-
-    # 전체 스키마를 deep copy하여 원본을 보호
-    schema = copy.deepcopy(app.openapi())
-
-    # servers 강제 덮어쓰기 (길이 = 1, url = demo_base_url)
-    schema["servers"] = [
-        {"url": demo_base_url, "description": "Mini Demo (Marketplace)"}
-    ]
-
-    # paths allowlist 필터 (오직 2개만)
-    allowed_paths = {"/v1/demo/runs", "/v1/demo/runs/{run_id}"}
-    schema["paths"] = {
-        k: v for k, v in schema.get("paths", {}).items() if k in allowed_paths
-    }
-
-    # FAIL-FAST: allowlist 외 path가 하나라도 남으면 500 (버그 신호)
-    leaked = set(schema["paths"].keys()) - allowed_paths
-    if leaked:
-        from dpp_api.schemas import ProblemDetail
-        problem = ProblemDetail(
-            type="https://api.decisionproof.ai/problems/internal-error",
-            title="openapi-demo path leak",
-            status=500,
-            detail=f"Non-allowlist paths leaked into demo spec: {sorted(leaked)}",
-        )
-        return JSONResponse(
-            status_code=500,
-            content=problem.model_dump(exclude_none=True),
-            media_type="application/problem+json",
-        )
-
-    return JSONResponse(
-        content=schema,
-        headers={"Cache-Control": "public, max-age=300"},
-    )
 
 
 @app.get("/pricing/ssot.json")
@@ -1114,12 +1081,26 @@ def create_app(
     new_app.include_router(runs.router)
     new_app.include_router(usage.router)
     new_app.include_router(auth.router)  # Phase 2: Auth/Email Onboarding
+    new_app.include_router(billing.router)  # Phase 2: Payment front door
+    new_app.include_router(onboarding.router)  # Phase 2: Onboarding status
 
     # Test endpoint for RC-7 gate tests
     @new_app.get("/v1/test-ratelimit")
     async def test_ratelimit_rc7():
         """Test endpoint for RC-7 OTel verification."""
         return {"status": "ok", "test": "ratelimit"}
+
+    # RC-7: Instrument FastAPI app with OTel FIRST (before other middlewares)
+    # This ensures FastAPIInstrumentor wraps all middlewares for proper span closure
+    if otel_enabled:
+        from opentelemetry import metrics, trace
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+        FastAPIInstrumentor.instrument_app(
+            new_app,
+            tracer_provider=trace.get_tracer_provider(),
+            meter_provider=metrics.get_meter_provider(),
+        )
 
     # Store OTel enabled flag for middleware
     new_app.state.otel_enabled = otel_enabled
@@ -1206,23 +1187,17 @@ def create_app(
             duration_ms = duration_seconds * 1000
             log = logging.getLogger(__name__)
 
-            # RC-7: Explicitly inject trace/span IDs from the active span.
-            # OTel is outermost middleware (added last), so the SERVER span is
-            # still active here. Belt-and-suspenders over LoggingInstrumentor.
-            from opentelemetry import trace as _otel_trace
-
-            _ctx = _otel_trace.get_current_span().get_span_context()
-            _extra: dict = {
-                "event": "http.request.completed",  # RC-7: For test compatibility
-                "method": request.method,
-                "path": request.url.path,
-                "status_code": status_code,
-                "duration_ms": round(duration_ms, 2),
-            }
-            if _ctx.is_valid:
-                _extra["trace_id"] = f"{_ctx.trace_id:032x}"
-                _extra["span_id"] = f"{_ctx.span_id:016x}"
-            log.info("http.request.completed", extra=_extra)
+            # RC-7: This log will automatically include trace_id/span_id via LoggingInstrumentor
+            log.info(
+                "http.request.completed",
+                extra={
+                    "event": "http.request.completed",  # RC-7: For test compatibility
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": status_code,
+                    "duration_ms": round(duration_ms, 2),
+                },
+            )
 
             # RC-7 Gate-3: Record http.server.request.duration metric
             # Get histogram on-demand to survive meter_provider resets (test fixture isolation)
@@ -1261,19 +1236,5 @@ def create_app(
 
     # Initialize rate limiter
     new_app.state.rate_limiter = NoOpRateLimiter(quota=60, window=60)
-
-    # RC-7: Instrument FastAPI app with OTel LAST (after all middlewares).
-    # Starlette middleware stack is LIFO: last-added = outermost.
-    # OTel must be outermost so completion_logging_mw executes inside the
-    # active SERVER span and can read trace/span IDs at log emission time.
-    if otel_enabled:
-        from opentelemetry import metrics, trace
-        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-
-        FastAPIInstrumentor.instrument_app(
-            new_app,
-            tracer_provider=trace.get_tracer_provider(),
-            meter_provider=metrics.get_meter_provider(),
-        )
 
     return new_app
