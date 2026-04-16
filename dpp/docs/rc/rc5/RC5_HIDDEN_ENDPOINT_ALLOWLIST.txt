@@ -9,3 +9,7 @@ GET /api-docs
 GET /docs/oauth2-redirect
 GET /openapi.json
 GET /redoc
+
+# RC-14: Demo marketplace spec - intentionally hidden from main OpenAPI schema
+# (marketplace listing uses its own locked spec, not the full API schema)
+GET /.well-known/openapi-demo.json
