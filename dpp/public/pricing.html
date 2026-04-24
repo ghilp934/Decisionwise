@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pricing — Decisionproof</title>
-  <meta name="description" content="Paid private beta: $29 per 30-day cycle, 1,000 decision credits included, hard cap 2,000 per cycle, PayPal only, no auto-renewal.">
+  <meta name="description" content="Sandbox paid private beta: $29 per 30-day access cycle, time-boxed and limit-enforced, per-run spend cap US$5.00, no overage billing, no auto-renewal. Sandbox is not the B2B Design Partner offer.">
   <link rel="canonical" href="https://www.decisionproof.io.kr/pricing.html">
   <link rel="stylesheet" href="/css/dpp.css">
 </head>
@@ -28,9 +28,9 @@
 
     <section class="hero" style="padding-bottom:48px;">
       <div class="container">
-        <div class="hero__eyebrow">Pricing — Paid private beta</div>
-        <h1 style="font-size:clamp(28px,4vw,44px);">One plan. Hard limits. No auto-renewal.</h1>
-        <p>Paid private beta pricing. You see every limit upfront. Cost settles per run against your spend cap.</p>
+        <div class="hero__eyebrow">Pricing — Sandbox paid private beta</div>
+        <h1 style="font-size:clamp(28px,4vw,44px);">Sandbox plan. Limit-enforced. No auto-renewal.</h1>
+        <p>Sandbox is a time-boxed, limit-enforced paid beta access path for individual or small-scale evaluation. There is no overage billing; requests that exceed active Sandbox limits are rejected fail-closed. Sandbox is not the B2B Design Partner offer &mdash; Design Partner engagements are contracted separately.</p>
       </div>
     </section>
 
@@ -41,21 +41,24 @@
           <div class="pricing-card pricing-card--featured">
 
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-              <span style="font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-secondary);">Private Beta</span>
+              <span style="font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-secondary);">Sandbox (Paid Private Beta)</span>
               <span class="badge badge--info">Limited seats</span>
             </div>
 
             <div class="pricing-price"><sup>$</sup>29</div>
-            <p class="pricing-period">per 30-day cycle &middot; manual renewal only</p>
+            <p class="pricing-period">per 30-day access cycle &middot; manual renewal only</p>
 
             <ul class="pricing-features">
-              <li><span class="check">✓</span> Full API feature access</li>
-              <li><span class="check">✓</span> 30-day access window per payment</li>
-              <li><span class="check">✓</span> 1,000 decision credits included</li>
-              <li><span class="check">✓</span> Hard cap: 2,000 credits per cycle</li>
-              <li><span class="check">✓</span> Per-run cost cap: $5.00</li>
-              <li><span class="check">✓</span> Up to 3 API keys per workspace</li>
-              <li><span class="check">✓</span> Exportable audit trail for every run</li>
+              <li><span class="check">✓</span> Access to the currently enabled Sandbox beta API surface</li>
+              <li><span class="check">✓</span> 30-day access window per payment &mdash; manual renewal only</li>
+              <li><span class="check">✓</span> Per-run spend cap <code>reservation.max_cost_usd</code>: <strong>US$5.00</strong></li>
+              <li><span class="check">✓</span> Workspace rate limit: <strong>60 requests per minute</strong></li>
+              <li><span class="check">✓</span> Monthly metered operations: <strong>up to 2,000 per 30-day cycle</strong> (hard cap)</li>
+              <li><span class="check">✓</span> Per-run execution timeout: <strong>30 seconds</strong></li>
+              <li><span class="check">✓</span> Per-run input / output token limits: <strong>16,000 / 4,000</strong></li>
+              <li><span class="check">✓</span> Up to <strong>3 API keys</strong> per workspace</li>
+              <li><span class="check">✓</span> Overage: <strong>HTTP 429 <code>quota-exceeded</code>, fail-closed, no overage billing</strong></li>
+              <li><span class="check">✓</span> Audit records under applicable retention tier (Sandbox Hot 30 days by default)</li>
             </ul>
 
             <a id="pricingCta" href="/login.html?tab=signup" class="btn btn--primary btn--full btn--lg">
@@ -63,20 +66,36 @@
             </a>
 
             <p class="text-xs text-muted text-center mt-16">
-              Paid private beta. PayPal only during beta. No auto-renewal. No uptime SLA during beta.
+              Sandbox paid private beta. PayPal during Sandbox beta. No auto-renewal. No overage billing. No uptime SLA during Sandbox beta.
             </p>
+          </div>
+
+          <div class="card mt-24" style="background:rgba(220, 38, 38, 0.06); border-left:3px solid var(--danger, #dc2626);">
+            <h3 style="font-size:15px; font-weight:700; margin:0 0 12px; color:var(--danger, #dc2626);">🛡️ Sandbox Hard Limits (enforced by the runtime)</h3>
+            <p class="text-sm text-muted mb-12">Every Sandbox request is evaluated against the limits below <strong>before</strong> any AI inference cost is incurred. Requests that would breach any limit are rejected immediately with HTTP 429 <code>quota-exceeded</code>. There is no overage billing &mdash; the plan is priced as US$29 per 30-day cycle with no additional charges in any condition.</p>
+            <ul style="list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;">
+              <li class="text-sm"><strong>Per-run spend cap:</strong> US$5.00 (<code>reservation.max_cost_usd</code>) &mdash; maximum USD reserved for a single run. Exceeding is rejected, not truncated.</li>
+              <li class="text-sm"><strong>Workspace rate limit:</strong> 60 requests per minute (sliding window). Exceeding returns HTTP 429 with <code>RateLimit-Remaining</code> / <code>Retry-After</code> headers.</li>
+              <li class="text-sm"><strong>Monthly metered-operation cap:</strong> up to 2,000 operations per 30-day access cycle. Hard cap, fail-closed &mdash; once the cap is reached, further requests return HTTP 429 <code>quota-exceeded</code> until the next paid cycle.</li>
+              <li class="text-sm"><strong>Per-run execution timeout:</strong> 30 seconds. Runs that exceed this are terminated and reconciled by the reaper.</li>
+              <li class="text-sm"><strong>Per-run input / output token limits:</strong> 16,000 / 4,000 tokens. Oversized requests are rejected with HTTP 422.</li>
+              <li class="text-sm"><strong>API keys per workspace:</strong> up to 3 concurrent <code>dp_live_*</code> keys.</li>
+              <li class="text-sm"><strong>No overage billing:</strong> any breach yields HTTP 429, never a charge. The $29/30-day payment is the only amount Decisionproof bills for Sandbox access.</li>
+            </ul>
+            <p class="text-xs text-muted mt-12">These numerics align with the internal runtime entitlement configuration (pricing_ssot.json) for the Sandbox paid private beta. They are contractual limits for the Sandbox tier only; B2B Design Partner contracts define their own limits in the signed pilot agreement.</p>
           </div>
 
           <div class="card mt-24" style="background:var(--surface-alt);">
             <h3 style="font-size:15px; font-weight:700; margin:0 0 12px;">Payment &amp; policy details</h3>
             <ul style="list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;">
-              <li class="text-sm"><strong>Accepted:</strong> PayPal only during beta (card payment may be available via PayPal guest checkout, depending on the flow PayPal presents to you)</li>
-              <li class="text-sm"><strong>Usage:</strong> 1,000 decision credits included per 30-day cycle, hard cap 2,000</li>
-              <li class="text-sm"><strong>Per-run cost cap:</strong> $5.00</li>
-              <li class="text-sm"><strong>API keys:</strong> Up to 3 per workspace during beta</li>
+              <li class="text-sm"><strong>Accepted:</strong> Sandbox payments are processed through PayPal during the paid private beta (card payment may be available via PayPal guest checkout, depending on the flow PayPal presents to you). B2B Design Partner engagements are contracted separately and billed through manual invoice, bank remittance, and applicable tax-invoice workflows.</li>
+              <li class="text-sm"><strong>Metering:</strong> Sandbox is time-boxed and limit-enforced (see the "Sandbox Hard Limits" block above for numerics). No overage billing &mdash; requests that exceed active Sandbox limits are rejected fail-closed.</li>
+              <li class="text-sm"><strong>Per-run spend cap:</strong> US$5.00 (<code>reservation.max_cost_usd</code>) &mdash; the maximum USD amount reserved for a single run. It is not your monthly, account-level, or workspace-level budget.</li>
+              <li class="text-sm"><strong>API keys:</strong> Up to 3 per workspace during Sandbox beta</li>
+              <li class="text-sm"><strong>Retention:</strong> Hot online access for 30 days by default. Cold Archive and Deep Archive are available only where included in the customer's plan or contract. Sandbox data does not automatically move to Cold Archive; after the Hot window, Sandbox records may be queued for deletion/purge under the applicable data handling policy, unless a separate plan, contract, legal hold, or security/audit obligation requires otherwise.</li>
               <li class="text-sm"><strong>Auto-renewal:</strong> None &mdash; renewal is always manual</li>
-              <li class="text-sm"><strong>Refunds:</strong> As a matter of commercial policy, refund requests are reviewed case-by-case within 48 hours of purchase. Outside that window, we do not offer refunds as a matter of policy &mdash; but any non-waivable consumer-protection rights in your jurisdiction (e.g. Korea 전자상거래법 7-day withdrawal) are preserved. See the <a href="/terms.html">Terms of Use</a>.</li>
-              <li class="text-sm"><strong>Invoice:</strong> Available via your PayPal receipt</li>
+              <li class="text-sm"><strong>Refunds:</strong> As a matter of commercial policy, refund requests are reviewed case-by-case within 48 hours of purchase. Outside that window, we do not offer refunds as a matter of policy &mdash; but any non-waivable consumer-protection rights in your jurisdiction (e.g. Korea 전자상거래법 7-day withdrawal) are preserved. See the <a href="/terms.html">Terms of Use</a>. B2B Design Partner refund and dispute handling is governed by the signed pilot agreement, not this Sandbox policy.</li>
+              <li class="text-sm"><strong>Invoice:</strong> Sandbox invoices are available via your PayPal receipt. B2B Design Partner invoicing is handled by manual invoice and bank remittance under the signed pilot agreement.</li>
               <li class="text-sm"><strong>Terms:</strong> Use of Decisionproof is governed by the <a href="/terms.html">Terms of Use</a></li>
             </ul>
           </div>
@@ -94,7 +113,7 @@
 
           <div>
             <h3 style="font-size:16px; font-weight:700; margin:0 0 6px;">What happens after 30 days?</h3>
-            <p class="text-muted text-sm mb-0">Your access expires and runs stop being accepted. You can renew at any time from your dashboard; a reminder email is sent before expiry.</p>
+            <p class="text-muted text-sm mb-0">Your Sandbox access expires and runs stop being accepted. You can renew at any time from your dashboard; a reminder email is sent before expiry. For data retention: Sandbox includes Hot online access for 30 days by default. After the Hot window, Sandbox records and result artifacts are not guaranteed to remain online or retrievable and may be queued for deletion/purge under the applicable data handling policy, unless a separate plan, contract, legal hold, or security/audit obligation requires otherwise.</p>
           </div>
 
           <div>
@@ -104,12 +123,12 @@
 
           <div>
             <h3 style="font-size:16px; font-weight:700; margin:0 0 6px;">Is there a free trial?</h3>
-            <p class="text-muted text-sm mb-0">Not during the paid private beta. Access is subscription-only.</p>
+            <p class="text-muted text-sm mb-0">Not during the Sandbox paid private beta. Access is subscription-only.</p>
           </div>
 
           <div>
-            <h3 style="font-size:16px; font-weight:700; margin:0 0 6px;">How do usage limits work?</h3>
-            <p class="text-muted text-sm mb-0">Each 30-day cycle includes 1,000 decision credits, with a per-cycle hard cap of 2,000 and a per-run cost cap of $5.00. Workspace-level rate limits also apply during beta.</p>
+            <h3 style="font-size:16px; font-weight:700; margin:0 0 6px;">How do Sandbox limits work?</h3>
+            <p class="text-muted text-sm mb-0">Sandbox is time-boxed and limit-enforced by six concrete numerics: 30-day access window, 60 req/min workspace rate limit, up to 2,000 metered operations per 30-day cycle (hard cap), per-run spend cap US$5.00 via <code>reservation.max_cost_usd</code>, 30 s per-run execution timeout, and 16,000/4,000 per-run input/output token limits. Exceeding any limit returns HTTP 429 <code>quota-exceeded</code>; there is no overage billing. The Sandbox plan is not the B2B Design Partner offer.</p>
           </div>
 
           <div>

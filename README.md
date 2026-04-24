@@ -1,5 +1,5 @@
-# Decisionproof — v0.4.2.8
-## Execution governance layer for AI decisions
+# Decisionproof — v0.4.2.10
+## Execution governance layer for AI runs
 
 [![Status](https://img.shields.io/badge/Status-Paid%20Private%20Beta-blue)](#status)
 [![Tests](https://img.shields.io/badge/Tests-passing-success)](#)
@@ -8,9 +8,9 @@
 
 **Spend caps, receipts, and automatic reconciliation for AI runs.**
 
-Decisionproof turns AI decision runs into budget-bounded, auditable, settlement-safe operations. You submit a run with a hard spend cap. The platform reserves budget, executes the work, writes a result artifact, and only then settles the cost. If a worker crashes, a lease expires, or a retry collides, a reconciliation loop rolls the run forward or back — deterministically, without silent money drift.
+Decisionproof is an execution governance / settlement integrity control layer for AI runs. It is **not an agent framework, prompt orchestration layer, model router, or model-quality evaluator.** You submit a run with a per-run spend cap under `reservation.max_cost_usd`. The platform reserves budget, executes the work, writes a result artifact, and only then settles the cost. If a worker crashes, a lease expires, or a retry collides, a reconciliation loop rolls the run forward or back — deterministically, without silent money drift.
 
-Built for teams that treat AI execution as an accountable economic transaction: decisions need to clear cleanly, cost needs to settle predictably, and the audit trail has to hold up under review.
+Built for teams that treat AI execution as an accountable economic transaction: runs need to clear cleanly, cost needs to settle predictably, and the audit trail has to hold up under review. Initial v1.0 integration is LiteLLM-first; other frameworks should route through the supported proxy path unless separately agreed.
 
 ---
 
@@ -18,7 +18,7 @@ Built for teams that treat AI execution as an accountable economic transaction: 
 
 **Paid Private Beta — Not Public GA.**
 
-### v0.4.2.8 Release Gates (all passing)
+### v0.4.2.10 Release Gates (all passing)
 
 | Gate | Description |
 |---|---|
@@ -27,12 +27,12 @@ Built for teams that treat AI execution as an accountable economic transaction: 
 | RC-14 | Mini Demo Marketplace — RapidAPI proxy gate, fail-closed 503, poll rate limit 429 |
 | RC-15 | K8s Image Digest Pin — all pilot Deployments use `@sha256:` immutable digest |
 
-This release is a paid private beta. APIs, limits, and operational defaults may change without notice. No uptime SLA during the beta period.
+This release is the Sandbox paid private beta, intended for individual or small-scale evaluation. It is **time-boxed and limit-enforced** — there is no unlimited usage, no overage billing, and no auto-renewal. Requests that exceed the active Sandbox limits are rejected fail-closed rather than accepted for additional charges. APIs, limits, and operational defaults may change without notice. No uptime SLA during the Sandbox paid private beta. The $29 / 30-day Sandbox plan is not the B2B Design Partner offer; Design Partner engagements are contracted separately.
 
 - Access requires account registration and payment at [decisionproof.io.kr](https://decisionproof.io.kr)
-- PayPal is the only supported payment method during beta
-- $29 USD per 30-day cycle, manual renewal only (no auto-renewal)
-- Rate limits and per-run cost caps apply (see [API docs](https://decisionproof.io.kr/docs/quickstart.html))
+- Sandbox payments are processed through PayPal during the paid private beta
+- $29 USD per 30-day access cycle, manual renewal only (no auto-renewal)
+- Workspace rate limits, per-run USD spend caps, and API-key limits apply (see [API docs](https://decisionproof.io.kr/docs/quickstart.html))
 
 Repository: https://github.com/ghilp934/Decisionproof
 
@@ -42,10 +42,10 @@ Repository: https://github.com/ghilp934/Decisionproof
 
 Agent frameworks, durable execution engines, and orchestration toolkits cover **how** an AI run is constructed and resumed. Decisionproof sits one layer up: it governs **what a run is allowed to spend, how completion is proven, and how cost settles** when things go wrong.
 
-- **Spend caps, reserved before work starts.** A run that would exceed its cap is rejected, not truncated mid-execution.
+- **Spend caps, reserved before work starts.** A run that would exceed its `reservation.max_cost_usd` per-run spend cap is rejected, not truncated mid-execution.
 - **Receipt-backed settlement.** Cost is committed only when the result artifact is written and its metadata is captured. No receipt means no settlement.
 - **Reaper reconciliation.** A continuous loop scans for lease expiry, stuck finalize stages, and missing receipts — and rolls forward or back deterministically.
-- **Audit trail as first-class output.** Every run is recorded as a complete input → state transitions → result → settlement record, exportable at any time.
+- **Audit trail as first-class output.** Run metadata, state transitions, receipt records, and result references are logged. Exports are governed by the applicable retention tier: Sandbox includes Hot online access for 30 days by default; Cold Archive and Deep Archive are available only where included in the customer's plan or contract.
 
 This is not a replacement for your agent framework. It is the financial and operational control layer you run around it.
 
@@ -73,14 +73,25 @@ Questions or feedback? Use the [contact form](https://decisionproof.io.kr/contac
 
 ---
 
-## Beta Constraints
+## Sandbox Beta Constraints (hard-coded numerics)
 
-- **Payment**: PayPal only (no other payment providers during beta)
-- **Billing cycle**: 30 days per payment ($29 USD), no auto-renewal
-- **Rate limits**: 10 POST/min, 120 poll/min per tenant
-- **Per-run cost cap**: $5.00 per run
-- **No uptime SLA** during beta period
+Every Sandbox request is evaluated against the limits below **before** any AI inference cost is incurred. Requests that would breach any limit are rejected with HTTP 429 `quota-exceeded`. There is no overage billing; US$29 / 30-day access is the only amount Decisionproof charges.
+
+- **Plan label**: Sandbox (paid private beta) — time-boxed, limit-enforced, **not unlimited**
+- **Payment**: PayPal during Sandbox beta; B2B Design Partner engagements are contracted separately and billed by invoice and bank remittance
+- **Access window**: 30 days per payment (US$29), manual renewal only, no auto-renewal
+- **Workspace rate limit**: **60 requests per minute** (sliding window); exceeding returns HTTP 429 with `RateLimit-Remaining` / `Retry-After` headers
+- **Monthly metered-operation cap**: **up to 2,000 metered operations per 30-day access cycle**, hard-capped, fail-closed
+- **Per-run spend cap (`reservation.max_cost_usd`)**: **US$5.00** — maximum USD reserved for a single run; not an account/monthly budget
+- **Per-run execution timeout**: **30 seconds**
+- **Per-run input / output token limits**: **16,000 / 4,000 tokens**
+- **API keys**: up to **3 concurrent** `dp_live_{secret}` keys per workspace
+- **Overage**: **no overage billing** — any breach yields HTTP 429, never a charge
+- **Retention**: Hot online access for 30 days by default; Cold Archive and Deep Archive are not included unless separately contracted
+- **No uptime SLA** during Sandbox paid private beta
 - **No free trial**
+
+These numerics align with the internal runtime entitlement configuration (`dpp/apps/api/dpp_api/pricing/fixtures/pricing_ssot.json`) for the Sandbox paid private beta. B2B Design Partner contracts define their own limits in the signed pilot agreement.
 
 ---
 
@@ -160,7 +171,7 @@ Submit a run:
 
 ```bash
 curl -X POST http://localhost:8000/v1/runs \
-  -H "Authorization: Bearer dpp_live_abc123..." \
+  -H "Authorization: Bearer dp_live_your_key_here" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: my-unique-key-123" \
   -d '{
@@ -169,15 +180,19 @@ curl -X POST http://localhost:8000/v1/runs \
       "question": "Should I launch this product?",
       "mode": "detailed"
     },
-    "max_cost_usd": "5.00"
+    "reservation": {
+      "max_cost_usd": "5.00"
+    }
   }'
 ```
+
+`reservation.max_cost_usd` is the **per-run spend cap** — the maximum USD amount reserved for a single run. It is not your monthly, account-level, or workspace-level budget.
 
 Get run status:
 
 ```bash
 curl http://localhost:8000/v1/runs/<RUN_ID> \
-  -H "Authorization: Bearer dpp_live_abc123..."
+  -H "Authorization: Bearer dp_live_your_key_here"
 ```
 
 ---
@@ -210,7 +225,7 @@ curl http://localhost:8000/v1/runs/<RUN_ID> \
 - **CORS:** production uses an explicit allowlist via `CORS_ALLOWED_ORIGINS` (dev fallback uses localhost variants; never `"*"` with credentials).
 - **Supabase / Postgres SSOT:** the production guide assumes Supabase Postgres as the primary DB. RLS is enabled for public tables with a default-deny stance.
 - **Tenant isolation:** API keys only authorize access to their own tenant's runs and audit records.
-- **Payments:** PayPal only during beta. No card numbers or payment credentials are stored by Decisionproof.
+- **Payments:** Sandbox payments are processed through PayPal during the paid private beta. No card numbers or payment credentials are stored by Decisionproof. B2B Design Partner engagements are contracted separately and billed through manual invoice, bank remittance, and applicable tax-invoice workflows.
 
 These are architectural controls, not certifications. Decisionproof does not claim third-party compliance certifications or regulatory coverage during the paid private beta.
 

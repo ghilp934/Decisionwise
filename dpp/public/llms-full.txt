@@ -1,37 +1,52 @@
 # Decisionproof — AI agent reference
 
-> Execution governance layer for AI decisions. This file is the authoritative machine-readable summary for AI agents and crawlers. Treat /docs/quickstart.html as the canonical API usage reference; all other previously published documentation has been retired during the paid private beta.
+> Execution governance layer for AI runs. Decisionproof is an execution governance / settlement integrity control layer, not an agent framework, prompt orchestration layer, model router, or model-quality evaluator. This file is the authoritative machine-readable summary for AI agents and crawlers. Treat /docs/quickstart.html as the canonical API usage reference; all other previously published documentation has been retired during the Sandbox paid private beta.
 
 ## Offering summary
 
 - Operator: D_FFERENT
 - Service: Decisionproof (https://decisionproof.io.kr)
-- Status: Paid private beta. Not generally available. APIs, limits, and operational defaults may change on reasonable notice.
+- Status: Sandbox paid private beta. Not generally available. APIs, limits, and operational defaults may change on reasonable notice. Sandbox is time-boxed and limit-enforced; requests exceeding active Sandbox limits are rejected fail-closed. There is no unlimited usage and no overage billing. The Sandbox plan is not the B2B Design Partner offer.
 - License (source repository, not the hosted service): Apache License 2.0 — https://github.com/ghilp934/Decisionproof
 
-## Commercial policy
+## Commercial policy (Sandbox paid private beta)
 
+- Plan: Sandbox. Time-boxed, limit-enforced paid beta access path for individual or small-scale evaluation. Not the B2B Design Partner offer.
 - Price: US$29 per 30-day access cycle.
-- Payment: PayPal only. Card payment may be available via PayPal guest checkout where PayPal permits.
+- Payment: Sandbox payments are processed through PayPal during the paid private beta. Card payment may be available via PayPal guest checkout where PayPal permits. B2B Design Partner engagements are contracted separately and billed through manual invoice, bank remittance, and applicable tax-invoice workflows.
 - Renewal: Manual only. No auto-renewal.
 - Refunds: Reviewed case-by-case within 48 hours of purchase as a matter of commercial policy. Non-waivable consumer-protection rights in the buyer's jurisdiction are preserved separately — see /terms.html.
 
-## Usage limits per 30-day cycle
+## Sandbox hard limits (per 30-day access cycle) — enforced by the runtime
 
-- Decision credits included: 1,000
-- Hard cap: 2,000 decision credits
-- Per-run cost cap: US$5.00
-- API keys per workspace: up to 3
-- Rate limits: workspace-level, may adjust during beta
+Every Sandbox request is evaluated against the limits below **before** any AI inference cost is incurred. Requests that would breach any limit are rejected with HTTP 429 `quota-exceeded`. There is no overage billing; US$29 / 30-day access is the only amount Decisionproof charges.
+
+- Access window: 30-day access window per payment; manual renewal only.
+- Per-run spend cap: `reservation.max_cost_usd` = US$5.00 (maximum USD reserved for a single run; not an account, workspace, monthly, or billing-cycle budget).
+- Workspace rate limit: 60 requests per minute (sliding window). Exceeding returns HTTP 429 with `RateLimit-Remaining` / `Retry-After` headers.
+- Monthly metered-operation cap: up to 2,000 operations per 30-day access cycle. Hard-capped, fail-closed — once the cap is reached, further requests return HTTP 429 `quota-exceeded` until the next paid cycle.
+- Per-run execution timeout: 30 seconds. Runs exceeding this are terminated and reconciled by the reaper.
+- Per-run input token limit: 16,000 tokens.
+- Per-run output token limit: 4,000 tokens.
+- API keys per workspace: up to 3 concurrent `dp_live_{secret}` keys.
+- Overage: no overage billing — any breach yields HTTP 429, never a charge.
+
+These numerics align with the internal runtime entitlement configuration (pricing_ssot.json) for the Sandbox paid private beta. Legal/commercial review of the customer-facing commitment is tracked for MT0A-3 legal surface update.
+
+## Retention (Sandbox)
+
+- Hot online access for 30 days by default.
+- Cold Archive and Deep Archive are available only where included in the customer's plan or contract.
+- Sandbox data does not automatically move to Cold Archive. After the Hot window, Sandbox records and result artifacts are not guaranteed to remain online or retrievable and may be queued for deletion/purge under the applicable data handling policy, unless a separate plan, contract, legal hold, or security/audit obligation requires otherwise.
 
 ## API basics
 
-- Base URL: https://api.decisionproof.io.kr
-- Authentication: `Authorization: Bearer dpp_live_{key}`
+- Base URL (production): https://api.decisionproof.io.kr
+- Authentication: `Authorization: Bearer dp_live_{secret}` (example placeholder: `dp_live_your_key_here`)
 - Idempotency: `Idempotency-Key` header required on `POST /v1/runs`
 - Async pattern: `POST /v1/runs` → 202 Accepted + `run_id`; poll `GET /v1/runs/{run_id}` until `status` is `completed` or `failed`
 - Errors: RFC 9457 Problem Details (`application/problem+json`)
-- Canonical body keys for a run: `pack_type`, `inputs`, `max_cost_usd`
+- Canonical body keys for a run: `pack_type`, `inputs`, `reservation` (with `reservation.max_cost_usd` as the per-run spend cap)
 
 ## Canonical public surfaces
 

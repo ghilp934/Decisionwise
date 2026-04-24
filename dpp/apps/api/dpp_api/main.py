@@ -25,14 +25,24 @@ from dpp_api.routers import admin, auth, billing, demo_runs, health, internal, o
 from dpp_api.schemas import ProblemDetail
 from dpp_api.utils import configure_json_logging
 
-# MTS-3.1: Base URL from environment variables
-base_url = os.getenv("API_BASE_URL", "https://api.decisionproof.ai")
-sandbox_url = os.getenv("API_SANDBOX_URL", "https://sandbox-api.decisionproof.ai")
+# MTS-3.1 / MT0A-1: Base URL from environment variables.
+# Public production default is api.decisionproof.io.kr per DEC-MT0A-03. Earlier
+# api.decisionproof.ai fallbacks are superseded for customer-facing OpenAPI
+# surface (/api-docs, /.well-known/openapi.json) and problem-type URIs.
+base_url = os.getenv("API_BASE_URL", "https://api.decisionproof.io.kr")
+sandbox_url = os.getenv("API_SANDBOX_URL", "https://sandbox-api.decisionproof.io.kr")
 
 app = FastAPI(
     title="Decisionproof API",
-    description="Agent-centric decision execution platform with idempotent metering, RFC 9457 error handling, and IETF RateLimit headers.",
-    version="0.4.2.2",
+    description=(
+        "Execution governance surface for budget-bounded AI runs, with idempotent "
+        "submission, per-run spend-cap enforcement (`reservation.max_cost_usd`), "
+        "receipt-backed settlement, RFC 9457 errors, and IETF RateLimit headers. "
+        "Decisionproof is an execution governance / settlement integrity control "
+        "layer — not an agent framework, prompt orchestration layer, model "
+        "router, or model-quality evaluator."
+    ),
+    version="0.4.2.10",
     docs_url="/api-docs",  # MTS-3: Moved to /api-docs to free /docs for documentation
     redoc_url="/redoc",
     openapi_version="3.1.0",  # MTS-3: Locked to OpenAPI 3.1.0
@@ -182,7 +192,7 @@ async def rate_limit_middleware(request: Request, call_next):
         instance = f"urn:decisionproof:trace:{request_id}" if request_id else f"urn:decisionproof:trace:{uuid.uuid4()}"
 
         problem = ProblemDetail(
-            type="https://api.decisionproof.ai/problems/http-429",
+            type="https://api.decisionproof.io.kr/problems/http-429",
             title="Too Many Requests",
             status=429,
             detail="Rate limit exceeded. Please retry after the specified time.",
@@ -405,7 +415,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     instance = f"urn:decisionproof:trace:{request_id}" if request_id else f"urn:decisionproof:trace:{uuid.uuid4()}"
 
     problem = ProblemDetail(
-        type=f"https://api.decisionproof.ai/problems/http-{exc.status_code}",
+        type=f"https://api.decisionproof.io.kr/problems/http-{exc.status_code}",
         title=_get_title_for_status(exc.status_code),
         status=exc.status_code,
         detail=detail_value,
@@ -437,7 +447,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     instance = f"urn:decisionproof:trace:{request_id}" if request_id else f"urn:decisionproof:trace:{uuid.uuid4()}"
 
     problem = ProblemDetail(
-        type="https://api.decisionproof.ai/problems/validation-error",
+        type="https://api.decisionproof.io.kr/problems/validation-error",
         title="Request Validation Failed",
         status=422,
         detail=f"Invalid field '{field}': {msg}",
@@ -463,7 +473,7 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
     instance = f"urn:decisionproof:trace:{request_id}" if request_id else f"urn:decisionproof:trace:{uuid.uuid4()}"
 
     problem = ProblemDetail(
-        type="https://api.decisionproof.ai/problems/internal-error",
+        type="https://api.decisionproof.io.kr/problems/internal-error",
         title="Internal Server Error",
         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="An unexpected error occurred. Please try again later.",
@@ -658,8 +668,8 @@ def custom_openapi():
     openapi_schema["components"]["securitySchemes"]["BearerAuth"] = {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "opaque-token",
-        "description": "Bearer token authentication. Format: sk_{key_id}_{secret} (e.g., sk_abc123_xyz789def456...). Include Idempotency-Key header for duplicate prevention.",
+        "bearerFormat": "dp_live_{secret}",
+        "description": "Bearer token authentication. Format: dp_live_{secret} (example placeholder: dp_live_your_key_here). Include Idempotency-Key header for duplicate prevention. MT0A-1: customer-facing token format is dp_live_*.",
     }
 
     # Apply security globally
@@ -697,8 +707,12 @@ _OPENAPI_DEMO_SPEC: dict = {
         "title": "Decisionproof Demo API",
         "version": "1.0.0",
         "description": (
-            "Public demo surface for Decisionproof. "
-            "Exactly 2 endpoints: submit a demo decision run and poll its result."
+            "Public demo surface for the Decisionproof execution governance "
+            "platform. Exactly 2 endpoints: submit a demo run and poll its "
+            "result. Decisionproof is an execution governance / settlement "
+            "integrity control layer — not an agent framework or model-quality "
+            "evaluator. Decisionproof does not warrant the accuracy, "
+            "completeness, or suitability of third-party AI model outputs."
         ),
     },
     "servers": [{"url": "https://api.decisionproof.io.kr"}],
@@ -706,12 +720,16 @@ _OPENAPI_DEMO_SPEC: dict = {
         "/v1/demo/runs": {
             "post": {
                 "operationId": "demo_run_create",
-                "summary": "Submit a Demo Decision Run",
+                "summary": "Submit a Demo Run",
                 "description": (
-                    "Submit a question for AI-powered decision evaluation. "
-                    "Returns a run_id for polling. "
-                    "Auth: X-RapidAPI-Proxy-Secret required. "
-                    "Plans: BASIC (6 POST/min) | PRO (24 POST/min)."
+                    "Submit a demo run for evaluation under the Decisionproof "
+                    "execution governance surface. Returns a run_id for "
+                    "polling. Auth: X-RapidAPI-Proxy-Secret required. "
+                    "Demo marketplace plans BASIC (6 POST/min) and PRO (24 "
+                    "POST/min) are specific to the RapidAPI marketplace "
+                    "listing and are not mapped to the customer-facing "
+                    "Sandbox / Design Partner / Growth / Enterprise tiers "
+                    "described on decisionproof.io.kr."
                 ),
                 "requestBody": {
                     "required": True,
@@ -728,7 +746,7 @@ _OPENAPI_DEMO_SPEC: dict = {
                                             "question": {
                                                 "type": "string",
                                                 "maxLength": 512,
-                                                "description": "The decision question to evaluate.",
+                                                "description": "Demo run question (max 512 chars). Decisionproof does not warrant the accuracy, completeness, or suitability of third-party AI model outputs.",
                                             }
                                         },
                                     }
@@ -837,23 +855,23 @@ async def function_calling_specs():
     from datetime import datetime, timezone
     from .schemas import RunCreateRequest
 
-    # Derive base URL from environment or default
-    base_url = os.getenv("API_BASE_URL", "https://api.decisionproof.ai")
+    # Derive base URL from environment or default (MT0A-1: .io.kr canonical)
+    base_url = os.getenv("API_BASE_URL", "https://api.decisionproof.io.kr")
 
     # Generate schema from Pydantic model (SSOT)
     run_create_schema = RunCreateRequest.model_json_schema()
 
     spec = {
-        "spec_version": "2026-02-17.v0.3.0",
+        "spec_version": "2026-04-24.v0.4.0-mt0a1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "base_url": base_url,
         "auth": {
             "type": "http",
             "scheme": "bearer",
-            "bearer_format": "opaque-token",
-            "description": "Bearer token authentication. Format: sk_{key_id}_{secret} (e.g., sk_abc123_xyz789def456...). Include Idempotency-Key header for duplicate prevention.",
+            "bearer_format": "dp_live_{secret}",
+            "description": "Bearer token authentication. Format: dp_live_{secret} (example placeholder: dp_live_your_key_here). Include Idempotency-Key header for duplicate prevention. MT0A-1: customer-facing token format is dp_live_*.",
             "headers": {
-                "Authorization": "Bearer sk_{key_id}_{secret}",
+                "Authorization": "Bearer dp_live_{secret}",
                 "Idempotency-Key": "unique-request-id (UUID recommended)"
             },
             "docs": f"{base_url}/docs/auth.md",
@@ -861,7 +879,7 @@ async def function_calling_specs():
         "tools": [
             {
                 "name": "create_decision_run",
-                "description": "Submit a run for asynchronous execution (202 Accepted). Returns run_id for polling.",
+                "description": "Submit a run for asynchronous execution (202 Accepted). Returns run_id for polling. `reservation.max_cost_usd` is the per-run spend cap.",
                 "endpoint": "/v1/runs",
                 "method": "POST",
                 "parameters": run_create_schema,
@@ -1130,14 +1148,22 @@ def create_app(
             log_correlation=otel_log_correlation,
         )
     
-    # Create FastAPI app
-    base_url_local = os.getenv("API_BASE_URL", "https://api.decisionproof.ai")
-    sandbox_url_local = os.getenv("API_SANDBOX_URL", "https://sandbox-api.decisionproof.ai")
+    # Create FastAPI app (MT0A-1: customer-facing OpenAPI uses .io.kr / dp_live_*)
+    base_url_local = os.getenv("API_BASE_URL", "https://api.decisionproof.io.kr")
+    sandbox_url_local = os.getenv("API_SANDBOX_URL", "https://sandbox-api.decisionproof.io.kr")
 
     new_app = FastAPI(
         title="Decisionproof API",
-        description="Agent-centric decision execution platform with idempotent metering, RFC 9457 error handling, and IETF RateLimit headers.",
-        version="0.4.2.2",
+        description=(
+            "Execution governance surface for budget-bounded AI runs, with "
+            "idempotent submission, per-run spend-cap enforcement "
+            "(`reservation.max_cost_usd`), receipt-backed settlement, "
+            "RFC 9457 errors, and IETF RateLimit headers. Decisionproof is "
+            "an execution governance / settlement integrity control layer — "
+            "not an agent framework, prompt orchestration layer, model "
+            "router, or model-quality evaluator."
+        ),
+        version="0.4.2.10",
         docs_url="/api-docs",
         redoc_url="/redoc",
         openapi_version="3.1.0",
@@ -1218,7 +1244,7 @@ def create_app(
             instance = f"urn:decisionproof:trace:{request_id}" if request_id else f"urn:decisionproof:trace:{uuid.uuid4()}"
 
             problem = ProblemDetail(
-                type="https://api.decisionproof.ai/problems/http-429",
+                type="https://api.decisionproof.io.kr/problems/http-429",
                 title="Too Many Requests",
                 status=429,
                 detail="Rate limit exceeded. Please retry after the specified time.",

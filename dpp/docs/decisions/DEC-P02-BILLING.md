@@ -1,8 +1,21 @@
 # DEC-P02: Paid Pilot Billing Provider Migration
 
-**Date**: 2026-02-18
-**Status**: LOCKED ✅
+**Date**: 2026-02-18 (amended 2026-04-24 by MT0A-1 supplement below)
+**Status**: LOCKED ✅ with MT0A-1 SUPPLEMENT
 **Category**: Payment Processing, Billing
+
+---
+
+## MT0A-1 Supplement (2026-04-24) — Billing Path A precedes Toss
+
+Per MT0A-1 (`_DP_v1_0/open_ssot_decisions_v0.2_redteam.md`), B2B Design Partner billing follows **Billing Path A first**:
+
+- **Billing Path A (critical path for v1.0 Design Partner)**: Manual invoice + IBK 기업은행 bank remittance + 세금계산서 (Korean tax invoice via 다원세무회계)
+- **Billing Path B (parallel; not critical path)**: TossPayments self-serve / Growth automation — per the existing DEC-P02 decisions below. PayPal remains as the Sandbox paid private beta path only, not as the B2B Design Partner default.
+
+The dual-provider entitlement controls (webhook + re-query, conservative refund/dispute revocation) defined in DEC-P02-2 / DEC-P02-3 / DEC-P02-4 remain in force for self-serve/automated payment paths (PayPal Sandbox, TossPayments Growth). B2B Design Partner entitlement is instead granted per the signed pilot agreement after manual invoice settlement is confirmed through the tax advisor (다원세무회계) and IBK bank reconciliation.
+
+Customer-facing Sandbox pricing copy (`dpp/public/pricing.html`, `terms.html`, `llms.txt`, `llms-full.txt`, README files) has been updated per MT0A-1 to remove Decision Credits / DC terminology and to state Sandbox is time-boxed, limit-enforced, fail-closed, no overage billing. Decision Credits remain forbidden in customer-facing surface per `SPEC_LOCK_PUBLIC_CONTRACT.md` §7.4 and DEC-MT0A-04.
 
 ---
 

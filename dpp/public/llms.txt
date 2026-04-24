@@ -1,12 +1,22 @@
 # Decisionproof
 
-> Execution governance layer for AI decisions. Spend caps, receipts, and automatic reconciliation for AI runs. Paid private beta.
+> Execution governance layer for AI runs. Spend caps, receipts, and automatic reconciliation for AI runs. Sandbox paid private beta. Decisionproof is not an agent framework or orchestration runtime; it is a control layer for budget-bounded AI runs.
 
 ## Service status
 
-- Paid private beta. Not generally available.
-- Pricing: US$29 per 30-day access cycle. PayPal only. No auto-renewal.
-- Included: 1,000 decision credits per cycle. Hard cap 2,000 credits per cycle. Per-run cost cap US$5.00. Up to 3 API keys per workspace.
+- Sandbox paid private beta. Not generally available.
+- Sandbox plan pricing: US$29 per 30-day access cycle. PayPal. No auto-renewal.
+- Sandbox is time-boxed and limit-enforced with the following hard numerics (enforced by the runtime before any AI inference cost is incurred):
+  - 30-day access window per payment; manual renewal only.
+  - Per-run spend cap `reservation.max_cost_usd`: US$5.00 (maximum USD reserved for a single run; not an account/monthly budget).
+  - Workspace rate limit: 60 requests per minute (sliding window).
+  - Monthly metered-operation cap: up to 2,000 operations per 30-day cycle, hard-capped, fail-closed.
+  - Per-run execution timeout: 30 seconds.
+  - Per-run input / output token limits: 16,000 / 4,000 tokens.
+  - Up to 3 concurrent API keys (format `dp_live_{secret}`) per workspace.
+  - No overage billing — any breach returns HTTP 429 `quota-exceeded`; US$29 / 30-day is the only amount Decisionproof charges for Sandbox access.
+- The Sandbox plan is not the B2B Design Partner offer; Design Partner engagements are contracted separately with their own limits defined in the signed pilot agreement.
+- Retention (Sandbox): Hot online access for 30 days by default. Cold Archive and Deep Archive are available only where included in the plan or contract. Sandbox data does not automatically move to Cold Archive.
 - Operator: D_FFERENT. Contact: ghilplip934@gmail.com.
 
 ## Primary public surfaces
@@ -21,17 +31,19 @@
 
 ## API
 
-- Base URL: https://api.decisionproof.io.kr
-- Authentication: `Authorization: Bearer dpp_live_{key}` (bearer token, managed from the dashboard, up to 3 keys per workspace)
+- Base URL (production): https://api.decisionproof.io.kr
+- Authentication: `Authorization: Bearer dp_live_{secret}` (example placeholder: `dp_live_your_key_here`) (bearer token, managed from the dashboard, up to 3 keys per workspace)
 - Idempotency: `Idempotency-Key` header required on `POST /v1/runs`
 - Async pattern: `POST /v1/runs` returns 202 with `run_id`; poll `GET /v1/runs/{run_id}` until `status` is `completed` or `failed`
+- Canonical body keys for a run: `pack_type`, `inputs`, `reservation` (with `reservation.max_cost_usd` as the per-run spend cap)
 - Error format: RFC 9457 Problem Details (`application/problem+json`)
 
 See /docs/quickstart.html for the only publicly supported usage examples.
 
 ## What this service is not
 
-- No third-party compliance certifications claimed during the paid private beta.
-- Not an agent framework or orchestration runtime.
-- Not under any uptime SLA during the paid private beta.
+- Not an agent framework, prompt orchestration layer, model router, or model-quality evaluator. Initial v1.0 integration is LiteLLM-first.
+- No third-party compliance certifications claimed during the Sandbox paid private beta.
+- Not under any uptime SLA during the Sandbox paid private beta.
 - Not available as a free tier.
+- Not unlimited. No overage billing in Sandbox.

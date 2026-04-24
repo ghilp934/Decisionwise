@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Decisionproof — Execution governance for AI decisions</title>
-  <meta name="description" content="Spend caps, receipts, and automatic reconciliation for AI runs. Decisionproof turns AI execution into budget-bounded, auditable, settlement-safe operations. Paid private beta.">
+  <title>Decisionproof — Execution governance for AI runs</title>
+  <meta name="description" content="Per-run spend caps, receipts, and automatic reconciliation for AI runs. Decisionproof is an execution governance / settlement integrity control layer — not an agent framework. Sandbox paid private beta.">
   <link rel="canonical" href="https://www.decisionproof.io.kr/">
   <link rel="stylesheet" href="/css/dpp.css">
 </head>
@@ -29,20 +29,20 @@
     <!-- Hero -->
     <section class="hero">
       <div class="container">
-        <div class="hero__eyebrow">Paid Private Beta — Limited Access</div>
-        <h1>Spend caps, receipts,<br>and reconciliation for AI runs</h1>
+        <div class="hero__eyebrow">Sandbox Paid Private Beta — Limited Access</div>
+        <h1>Per-run spend caps, receipts,<br>and reconciliation for AI runs</h1>
         <p>
           Uncontrolled AI execution is a financial and operational risk.
-          Decisionproof turns AI runs into budget-bounded, auditable,
-          settlement-safe operations — with hard spend caps, receipt-backed
+          Decisionproof is an execution governance / settlement integrity
+          control layer for AI runs — with per-run spend caps, receipt-backed
           cost settlement, and a reconciliation loop that rolls every run
           forward or back, deterministically.
         </p>
         <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-          <a href="/login.html?tab=signup" class="btn btn--primary btn--lg">Join private beta</a>
+          <a href="/login.html?tab=signup" class="btn btn--primary btn--lg">Join Sandbox beta</a>
           <a href="/docs/quickstart.html" class="btn btn--outline btn--lg">Read the docs</a>
         </div>
-        <p class="text-sm text-muted mt-24">$29 / 30 days &mdash; PayPal only &mdash; no auto-renewal</p>
+        <p class="text-sm text-muted mt-24">Sandbox paid private beta &mdash; $29 / 30-day access &mdash; PayPal &mdash; no auto-renewal &mdash; not the B2B Design Partner offer</p>
       </div>
     </section>
 
@@ -53,8 +53,8 @@
 
           <div class="card">
             <div style="font-size:32px; margin-bottom:12px;">💰</div>
-            <h3 style="margin:0 0 8px; font-size:17px; font-weight:700;">Hard spend caps</h3>
-            <p class="text-muted text-sm mb-0">Submit each run with a max cost. Budget is reserved before work starts — runs that would exceed the cap are rejected, not truncated.</p>
+            <h3 style="margin:0 0 8px; font-size:17px; font-weight:700;">Per-run spend caps</h3>
+            <p class="text-muted text-sm mb-0">Submit each run with a per-run spend cap (<code>reservation.max_cost_usd</code>). Budget is reserved before work starts — runs that would exceed the cap are rejected, not truncated. This is the maximum USD reserved for a single run; it is not your monthly, account-level, or workspace-level budget.</p>
           </div>
 
           <div class="card">
@@ -71,8 +71,8 @@
 
           <div class="card">
             <div style="font-size:32px; margin-bottom:12px;">🗂️</div>
-            <h3 style="margin:0 0 8px; font-size:17px; font-weight:700;">Exportable audit trail</h3>
-            <p class="text-muted text-sm mb-0">Every run is recorded as input → state transitions → result → settlement, and exportable at any time. No TTL on the data.</p>
+            <h3 style="margin:0 0 8px; font-size:17px; font-weight:700;">Audit-ready exports</h3>
+            <p class="text-muted text-sm mb-0">Run metadata, state transitions, receipt records, and result references are logged. Exports are governed by the applicable retention tier: Sandbox includes Hot online access for 30 days by default; Cold Archive and Deep Archive are available only where included in the customer's plan or contract.</p>
           </div>
 
           <div class="card">
@@ -96,11 +96,15 @@
       <div class="container" style="max-width:720px;">
         <h2 class="section-title">Not an agent framework. The control layer you run around it.</h2>
         <p class="text-muted" style="font-size:16px; line-height:1.75;">
-          Agent frameworks, durable execution engines, and orchestration toolkits
-          cover how an AI run is constructed and resumed. Decisionproof sits one
-          layer up: it governs what a run is allowed to spend, how completion is
-          proven, and how cost settles when a worker crashes, a lease expires,
-          or a retry collides.
+          Decisionproof is not an agent framework, prompt orchestration layer,
+          model router, or model-quality evaluator. Agent frameworks, durable
+          execution engines, and orchestration toolkits cover how an AI run is
+          constructed and resumed. Decisionproof sits one layer up: it governs
+          what a run is allowed to spend, how completion is proven, and how
+          cost settles when a worker crashes, a lease expires, or a retry
+          collides. Initial v1.0 integration is LiteLLM-first; other frameworks
+          should route through the supported proxy path unless separately
+          agreed.
         </p>
         <p class="text-muted mt-16" style="font-size:16px; line-height:1.75;">
           Treat each run as an accountable economic transaction. Decisionproof
@@ -115,7 +119,7 @@
       <div class="container text-center">
         <h2 class="section-title">Ready to try it?</h2>
         <p class="text-muted mb-32" style="font-size:17px;">
-          Paid private beta &mdash; $29 for 30 days, 1,000 decision credits included, no auto-renewal.
+          Sandbox paid private beta &mdash; $29 for 30-day access, time-boxed and limit-enforced, per-run spend caps, no overage billing, no auto-renewal.
         </p>
         <a href="/login.html?tab=signup" class="btn btn--primary btn--lg">Get started</a>
       </div>

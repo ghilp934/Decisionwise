@@ -1,26 +1,32 @@
-# SPEC LOCK: Public Contract v0.4.2.2
+# SPEC LOCK: Public Contract v0.4.2.10 (MT0A-1 Aligned)
 
-**Status**: LOCKED (Single Source of Truth)
-**Effective Date**: 2026-02-17
-**Project**: Decisionwise API Platform (Decisionproof)
-**Purpose**: This document defines the **immutable public API contract** for v0.4.2.2. All documentation (public/docs, pilot docs, llms.txt) and machine-readable specs (function-calling-specs.json, OpenAPI) MUST conform to this specification.
+**Status**: LOCKED (Single Source of Truth) — Updated per MT0A-1 Surface Sync Patch
+**Effective Date**: 2026-04-24 (MT0A-1 patch)
+**Project**: Decisionproof
+**Purpose**: This document defines the **public API contract** aligned with MT0A-1 DEC decisions. All documentation (public/docs, pilot docs, llms.txt) and machine-readable specs (function-calling-specs.json, OpenAPI) MUST conform to this specification. Earlier spec values (`sk_{key_id}_{secret}`, `api.decisionproof.ai`, 45-day retention) are **superseded** by the MT0A-1 DEC register (`open_ssot_decisions_v0.2_redteam.md`).
+
+**MT0A-1 supersede summary**:
+- Auth token format: `sk_{key_id}_{secret}` → `dp_live_{secret}` (DEC-MT0A-01)
+- API host: `api.decisionproof.ai` → `api.decisionproof.io.kr` (DEC-MT0A-03)
+- Retention: 45-day run / 30-day S3 → Hot 30 days default (Sandbox), Cold/Deep by plan/contract (DEC-MT0A-05)
+- Pricing unit: Decision Credits ban retained; Sandbox is time-boxed, limit-enforced, fail-closed (DEC-MT0A-04)
+- `max_cost_usd` is always a **per-run spend cap** under `reservation.max_cost_usd` (DEC-MT0A-02)
 
 ---
 
-## 1. Authentication (LOCK)
+## 1. Authentication (LOCK — MT0A-1 aligned)
 
 ### 1.1 Header Format
 - **Header Name**: `Authorization`
 - **Scheme**: `Bearer`
-- **Token Format**: `sk_{key_id}_{secret}`
-  - Example: `sk_abc123_xyz789def456...`
-  - **NO environment prefix** (no `sk_live_` or `sk_test_`)
+- **Token Format**: `dp_live_{secret}`
+  - Example placeholder: `dp_live_your_key_here`
 
 ### 1.2 Request Example
 ```http
 POST /v1/runs HTTP/1.1
-Host: api.decisionproof.ai
-Authorization: Bearer sk_abc123_xyz789def456...
+Host: api.decisionproof.io.kr
+Authorization: Bearer dp_live_your_key_here
 Idempotency-Key: unique-request-id-12345
 Content-Type: application/json
 ```
@@ -29,6 +35,8 @@ Content-Type: application/json
 - ❌ `X-API-Key` header (removed, not supported)
 - ❌ Key format `dw_live_*` or `dw_test_*` (legacy, replaced)
 - ❌ Key format `sk_live_*` or `sk_test_*` (environment prefix removed)
+- ❌ Key format `dpp_live_*` (legacy customer-facing format; superseded by `dp_live_*` per DEC-MT0A-01)
+- ❌ Key format `sk_{key_id}_{secret}` (legacy; superseded by `dp_live_*` per DEC-MT0A-01)
 
 ### 1.4 Error Responses
 - **401 Unauthorized**: Missing or invalid `Authorization` header
@@ -44,7 +52,7 @@ Content-Type: application/json
 - **Method**: `POST /v1/runs`
 - **Status**: `202 Accepted` (asynchronous operation)
 - **Headers**:
-  - `Authorization: Bearer sk_{key_id}_{secret}` (REQUIRED)
+  - `Authorization: Bearer dp_live_{secret}` (REQUIRED)
   - `Idempotency-Key: <unique-id>` (REQUIRED for duplicate prevention)
   - `Content-Type: application/json`
 
@@ -71,7 +79,7 @@ Content-Type: application/json
 - `pack_type` (string, required): Pack type identifier
 - `inputs` (object, required): Pack-specific inputs
 - `reservation` (object, required):
-  - `max_cost_usd` (string, required): 4 decimal places max (e.g., "0.0050")
+  - `max_cost_usd` (string, required): **per-run spend cap** — the maximum USD amount reserved for a single run. It is not an account-level, workspace-level, monthly, or billing-cycle budget. 4 decimal places max (e.g., "0.0050").
   - `timebox_sec` (integer, optional): 1-90, default 90
   - `min_reliability_score` (float, optional): 0.0-1.0, default 0.8
 - `meta` (object, optional):
@@ -102,7 +110,7 @@ Content-Type: application/json
 #### Request
 ```http
 GET /v1/runs/run_abc123def456... HTTP/1.1
-Authorization: Bearer sk_abc123_xyz789...
+Authorization: Bearer dp_live_your_key_here
 ```
 
 #### Response (200 OK - RunStatusResponse)
@@ -147,7 +155,7 @@ Authorization: Bearer sk_abc123_xyz789...
 #### Request
 ```http
 GET /v1/tenants/tenant_abc123/usage HTTP/1.1
-Authorization: Bearer sk_abc123_xyz789...
+Authorization: Bearer dp_live_your_key_here
 ```
 
 #### Response (200 OK)
@@ -187,16 +195,16 @@ Authorization: Bearer sk_abc123_xyz789...
 ### 3.2 Example
 ```bash
 # First request
-curl -X POST https://api.decisionproof.ai/v1/runs \
-  -H "Authorization: Bearer sk_abc123_xyz789..." \
+curl -X POST https://api.decisionproof.io.kr/v1/runs \
+  -H "Authorization: Bearer dp_live_your_key_here" \
   -H "Idempotency-Key: request-20260217-001" \
   -d '{"pack_type": "decision", ...}'
 
 # Response: 202 Accepted, run_id: run_abc123
 
 # Duplicate request (within 7 days)
-curl -X POST https://api.decisionproof.ai/v1/runs \
-  -H "Authorization: Bearer sk_abc123_xyz789..." \
+curl -X POST https://api.decisionproof.io.kr/v1/runs \
+  -H "Authorization: Bearer dp_live_your_key_here" \
   -H "Idempotency-Key: request-20260217-001" \
   -d '{"pack_type": "decision", ...}'
 
@@ -226,7 +234,7 @@ curl -X POST https://api.decisionproof.ai/v1/runs \
 ### 4.3 Example
 ```json
 {
-  "type": "https://docs.decisionproof.ai/errors/budget-exceeded",
+  "type": "https://docs.decisionproof.io.kr/errors/budget-exceeded",
   "title": "Budget Exceeded",
   "status": 402,
   "detail": "Requested max_cost_usd (0.0500) exceeds remaining budget (0.0200)",
@@ -269,7 +277,7 @@ curl -X POST https://api.decisionproof.ai/v1/runs \
 **Body** (RFC 9457):
 ```json
 {
-  "type": "https://docs.decisionproof.ai/errors/rate-limit-exceeded",
+  "type": "https://docs.decisionproof.io.kr/errors/rate-limit-exceeded",
   "title": "Rate Limit Exceeded",
   "status": 429,
   "detail": "Request rate limit exceeded (100 req/min). Retry after 60 seconds.",
@@ -355,24 +363,63 @@ X-Request-ID: req_abc123def456789
 - ❌ "Decision Credits" (DC) terminology in customer-facing docs
 - ❌ Credit/point-based pricing (use USD only)
 - ❌ "Monthly DC quota" (use USD budget)
+- ❌ "Unlimited API usage", "unlimited runs", "unlimited requests", "unmetered Sandbox" (Sandbox is time-boxed, limit-enforced, fail-closed per DEC-MT0A-04)
+- ❌ Invented replacement quotas such as "1,000 runs included" or "$X monthly budget" unless a pricing DEC (MT0A-2) confirms the number from runtime entitlement SSOT and legal/commercial review.
+
+### 7.5 Sandbox Metering Model (MT0A-1, runtime-aligned numerics)
+
+Sandbox is a time-boxed, limit-enforced paid beta access path. The following **hard numerics** are enforced by the runtime (`dpp/apps/api/dpp_api/pricing/fixtures/pricing_ssot.json`, Sandbox paid private beta entitlement) **before** any AI inference cost is incurred, and are published as a customer-facing contract:
+
+| Limit | Value | Runtime policy | Breach behaviour |
+|---|---|---|---|
+| Access window | 30 days per payment; manual renewal only | time-boxed entitlement | entitlement expiry → 402 `entitlement_inactive` |
+| Per-run spend cap | US$5.00 (`reservation.max_cost_usd`) | `max_cost_usd_micros` pack limit | 422 `max_cost_too_high` (non-billable) |
+| Workspace rate limit | 60 requests per minute (sliding window) | `rate_limit_rpm: 60` + Redis sliding window | 429 `quota-exceeded` + `Retry-After` |
+| Monthly metered-operation cap | up to 2,000 operations per 30-day cycle | `monthly_quota_dc: 2000`, `hard_overage_dc_cap` absorbed into overall cap; `overage_behavior: block_on_breach` | 429 `quota-exceeded` (non-billable) |
+| Per-run execution timeout | 30 seconds | `max_execution_seconds: 30` | run terminated; reaper reconciles |
+| Per-run input token limit | 16,000 tokens | `max_input_tokens: 16000` | 422 |
+| Per-run output token limit | 4,000 tokens | `max_output_tokens: 4000` | 422 / run terminated mid-execution |
+| API keys per workspace | up to 3 concurrent `dp_live_{secret}` keys | token manager | 403 / refuse issuance |
+| Overage billing | **none** — any breach yields HTTP 429, never a charge | `overage_behavior: block_on_breach` + `hard_spending_limit` | N/A |
+
+**Fail-closed guarantee**: the US$29 / 30-day fee is the only amount Decisionproof charges for Sandbox access. Any request that would exceed any of the limits above is **rejected pre-cost** and does not consume LLM inference credits against the Sandbox user.
+
+**Tier scope**: the Sandbox plan is not the B2B Design Partner offer. Design Partner engagements are contracted separately with their own limits defined in the signed pilot agreement. Growth / Enterprise tiers are not currently offered; references to those tier names in pricing_ssot.json are reserved for MT0A-2 Pricing Skeleton Lock.
 
 ---
 
-## 8. Retention & Data Lifecycle (LOCK)
+## 8. Retention & Data Lifecycle (LOCK — MT0A-1 aligned)
 
-### 8.1 Run Retention
-- **Retention Period**: 45 days from creation
-- **After Expiry**:
+### 8.1 Customer-facing Retention Tiers (MT0A-1)
+
+| Tier | Public Meaning | MT0A-1 Surface Language |
+|---|---|---|
+| Hot | Online operational/audit data available for immediate export | Hot online access for 30 days |
+| Cold | Archived audit records retrievable after the hot window | Cold archive up to 1 year, available only where included in the plan or contract |
+| Deep Archive | Long-term retention for regulated/high-retention customers | Paid add-on / contract-specific option |
+
+### 8.2 Sandbox Retention (MT0A-1)
+
+- Sandbox includes Hot online access for 30 days by default.
+- Sandbox data does **not** automatically move to Cold Archive.
+- After the Hot window, Sandbox records and result artifacts are **not guaranteed** to remain online or retrievable and may be queued for deletion/purge under the applicable data handling policy, unless a separate plan, contract, legal hold, or security/audit obligation requires otherwise.
+- Cold Archive and Deep Archive are available only where included in the customer's plan or contract.
+
+### 8.3 Run API Retention Behavior
+- **After the applicable retention/purge window**:
   - `GET /v1/runs/{run_id}` returns `410 Gone`
-  - Result file (S3) deleted automatically (30-day lifecycle rule)
+  - Result artifact is subject to the storage-tier lifecycle corresponding to the customer's active plan or contract
+
+### 8.4 Superseded (legacy)
+The previous "45-day run retention / 30-day S3 lifecycle" baseline is superseded by the tiering above per DEC-MT0A-05. Internal lifecycle defaults may continue to use shorter windows for Sandbox; the customer-facing promise is Hot 30 days only, with no implicit Cold Archive for Sandbox.
 
 ### 8.2 410 Gone Response
 ```json
 {
-  "type": "https://docs.decisionproof.ai/errors/run-expired",
+  "type": "https://docs.decisionproof.io.kr/errors/run-expired",
   "title": "Run Expired",
   "status": 410,
-  "detail": "Run run_abc123def456 exceeded 45-day retention period",
+  "detail": "Run run_abc123def456 exceeded the applicable retention window",
   "instance": "/v1/runs/run_abc123def456",
   "reason_code": "RUN_EXPIRED",
   "trace_id": "abc123-def456-789"
@@ -391,8 +438,8 @@ X-Request-ID: req_abc123def456789
       "BearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "sk_{key_id}_{secret}",
-        "description": "Bearer token authentication. Format: sk_{key_id}_{secret} (e.g., sk_abc123_xyz789...)"
+        "bearerFormat": "dp_live_{secret}",
+        "description": "Bearer token authentication. Format: dp_live_{secret} (example placeholder: dp_live_your_key_here)"
       }
     }
   }
@@ -402,6 +449,8 @@ X-Request-ID: req_abc123def456789
 **FORBIDDEN**:
 - ❌ `sk_{environment}_{key_id}_{secret}` (no environment prefix)
 - ❌ `X-API-Key` security scheme
+- ❌ `sk_{key_id}_{secret}` (superseded by `dp_live_*` per DEC-MT0A-01)
+- ❌ `dpp_live_*` (superseded by `dp_live_*` per DEC-MT0A-01)
 
 ### 9.2 Function Calling Specs (/docs/function-calling-specs.json)
 - **Schema Source**: `RunCreateRequest` Pydantic model (apps/api/dpp_api/schemas.py)
@@ -422,13 +471,14 @@ X-Request-ID: req_abc123def456789
 
 ### 10.2 Forbidden Drift Detection
 - **CI/CD Gate**: Automated test scans for forbidden tokens
-- **Tokens**: `X-API-Key`, `dw_live_`, `dw_test_`, `sk_live_`, `sk_test_`, `workspace_id`, `plan_id`, `Decision Credits`
-- **Scope**: `public/docs`, `docs/pilot`, `public/llms.txt`, `apps/api/dpp_api/main.py`
+- **Tokens**: `X-API-Key`, `dw_live_`, `dw_test_`, `sk_live_`, `sk_test_`, `sk_{key_id}_{secret}`, `dpp_live_`, `workspace_id`, `plan_id`, `Decision Credits`, `decision credits`, `No TTL`, `unlimited retention`, `unlimited runs`, `unlimited Sandbox`, `api.decisionproof.ai` (active public examples)
+- **Scope**: `public/docs`, `docs/pilot`, `public/llms.txt`, `public/llms-full.txt`, `apps/api/dpp_api/main.py`
 
 ### 10.3 Version History
 | Version | Date | Changes |
 |---------|------|---------|
 | v0.4.2.2 | 2026-02-17 | Initial SPEC LOCK: Bearer auth, async runs, RFC 9457, rate limits, no DC terminology |
+| v0.4.2.10 (MT0A-1) | 2026-04-24 | MT0A-1 Surface Sync Patch: auth token → `dp_live_{secret}`; API host → `api.decisionproof.io.kr`; retention → Hot 30 default + Cold/Deep by plan/contract; Sandbox limit-enforced (no unlimited, no invented quota); `reservation.max_cost_usd` per-run qualifier locked. |
 
 ---
 

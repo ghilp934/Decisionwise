@@ -13,10 +13,27 @@
  * never generates or passes a PayPal-Request-Id — that's handled server-side.
  *
  * B-01: PAYPAL_CLIENT_ID must be set at page render time via window.__DPP_CONFIG__.
+ *
+ * MT0A-1 review (2026-04-24):
+ *   - This client drives the Sandbox (paid private beta) checkout only.
+ *     PLAN_ID = 'beta_private_starter_v1' maps to the Sandbox plan per
+ *     DEC-MT0A-04. This is not the B2B Design Partner offer; Design
+ *     Partner engagements are contracted separately and billed through
+ *     manual invoice / bank remittance (Billing Path A, MT0A-2+).
+ *   - No Decision Credits / DC calculations — payment amount and
+ *     entitlement are authoritatively determined by backend webhooks
+ *     (PayPal CAPTURE → onboarding/status polling). The client never
+ *     performs USD↔DC conversion or credits-based math. ✓
+ *   - Backend endpoints consumed (/v1/billing/checkout-sessions,
+ *     /v1/billing/paypal/orders, /v1/billing/paypal/capture,
+ *     /v1/onboarding/status) are accessed via `dpp-api.js`, which uses
+ *     the canonical `api.decisionproof.io.kr` host per DEC-MT0A-03. ✓
  */
 
 import { api, ApiError } from './dpp-api.js';
 
+// Sandbox plan identifier — MT0A-1: customer-facing label is "Sandbox";
+// the underlying plan ID string is retained for backend compatibility.
 const PLAN_ID = 'beta_private_starter_v1';
 
 /* ─── State ─────────────────────────────────────────────────────────────── */

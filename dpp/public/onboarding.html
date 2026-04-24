@@ -41,7 +41,7 @@
         <div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:32px;">
           <div>
             <h1 style="font-size:28px; font-weight:800; margin:0 0 6px;">Get started</h1>
-            <p class="text-muted mb-0">Complete each step to start using Decisionproof.</p>
+            <p class="text-muted mb-0">Complete each step to start using the Decisionproof Sandbox paid private beta.</p>
           </div>
           <div id="entitlementBadge"></div>
         </div>
@@ -88,10 +88,10 @@
       { key: 'signup_complete',    label: 'Create account',           desc: 'Your account is active.',                                     action: null },
       { key: 'email_confirmed',    label: 'Email address verified',    desc: 'Sign in with Google to verify your identity.',                action: { label: 'Sign in with Google', href: '/login.html' } },
       { key: 'tenant_resolved',    label: 'Workspace ready',           desc: 'Your workspace has been provisioned.',                         action: null },
-      { key: 'payment_complete',   label: 'Activate subscription',     desc: 'Subscribe to get full API access.',                            action: { label: 'Go to checkout', href: '/checkout.html' } },
-      { key: 'entitlement_active', label: 'Subscription active',       desc: 'Your 30-day access window is running.',                        action: { label: 'Go to checkout', href: '/checkout.html' } },
-      { key: 'token_issued',       label: 'Create your first API key', desc: 'You need an API key to authenticate requests.',                action: { label: 'Create API key', href: null, fn: 'createApiKey' } },
-      { key: 'first_run_complete', label: 'Make your first API call',  desc: 'Run a decision and see the results.',                          action: { label: 'Read quickstart', href: '/docs/quickstart.html' } },
+      { key: 'payment_complete',   label: 'Activate Sandbox access',   desc: 'Subscribe to activate the Sandbox paid private beta — access to the currently enabled Sandbox beta API surface.', action: { label: 'Go to checkout', href: '/checkout.html' } },
+      { key: 'entitlement_active', label: 'Sandbox access active',     desc: 'Your 30-day Sandbox access window is running.',                action: { label: 'Go to checkout', href: '/checkout.html' } },
+      { key: 'token_issued',       label: 'Create your first API key', desc: 'You need an API key (format: dp_live_{secret}) to authenticate requests.', action: { label: 'Create API key', href: null, fn: 'createApiKey' } },
+      { key: 'first_run_complete', label: 'Make your first API call',  desc: 'Submit your first run and see the results.',                   action: { label: 'Read quickstart', href: '/docs/quickstart.html' } },
     ];
 
     window.createApiKey = async function() {

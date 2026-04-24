@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Security &amp; Reliability — Decisionproof</title>
-  <meta name="description" content="Architectural controls behind Decisionproof: WORM audit storage, tenant isolation, PayPal-only payments, API-key auth, and deterministic recovery for AI runs. Paid private beta.">
+  <meta name="description" content="Architectural controls behind Decisionproof: tamper-evident audit evidence, tenant isolation, Sandbox PayPal payments, API-key auth, and deterministic recovery for AI runs. Sandbox paid private beta.">
   <link rel="canonical" href="https://www.decisionproof.io.kr/security.html">
   <link rel="stylesheet" href="/css/dpp.css">
 </head>
@@ -48,32 +48,44 @@
 
           <div class="trust-item">
             <div class="trust-item__icon">🗂️</div>
-            <h2 class="trust-item__title">Every run is logged</h2>
+            <h2 class="trust-item__title">Run metadata is logged</h2>
             <p class="trust-item__desc">
-              All runs are recorded with a full input → state transitions → result
-              → settlement trace. You can export the complete audit log at any
-              time from your dashboard — no request needed, no TTL on the data.
+              Decisionproof records run metadata, state transitions, receipt
+              records, settlement amounts, and result references needed for
+              auditability. Raw input and result-body handling are governed by
+              the applicable data handling and retention policy. Exports from
+              your dashboard are available under the applicable retention tier:
+              Sandbox includes Hot online access for 30 days by default; Cold
+              Archive and Deep Archive are available only where included in the
+              customer's plan or contract.
             </p>
           </div>
 
           <div class="trust-item">
             <div class="trust-item__icon">🔒</div>
-            <h2 class="trust-item__title">WORM-protected evidence storage</h2>
+            <h2 class="trust-item__title">Tamper-evident audit evidence</h2>
             <p class="trust-item__desc">
-              Audit evidence is written to a write-once, read-many (WORM) S3 bucket.
-              Records cannot be modified or deleted after creation — not by the
-              application, not by an operator mistake.
+              Audit evidence is designed to be append-only and tamper-evident,
+              backed by write-once, read-many (WORM) storage for the relevant
+              records. Lifecycle retention, personal-data deletion requests,
+              legal holds, and security/audit obligations are handled
+              separately under the applicable data handling policy and customer
+              contract &mdash; immutable audit evidence does not override those
+              lifecycle controls.
             </p>
           </div>
 
           <div class="trust-item">
             <div class="trust-item__icon">💳</div>
-            <h2 class="trust-item__title">PayPal-only payments</h2>
+            <h2 class="trust-item__title">Sandbox payments via PayPal</h2>
             <p class="trust-item__desc">
               Decisionproof does not store card numbers or payment credentials.
-              All payment processing is handled by PayPal. Card payment may be
-              available through PayPal guest checkout for eligible buyers, depending
-              on the flow PayPal presents.
+              Sandbox payments are processed through PayPal during the paid
+              private beta. Card payment may be available through PayPal guest
+              checkout for eligible buyers, depending on the flow PayPal
+              presents. B2B Design Partner engagements are contracted
+              separately and billed through manual invoice, bank remittance,
+              and applicable tax-invoice workflows.
             </p>
           </div>
 
@@ -101,11 +113,14 @@
 
           <div class="trust-item">
             <div class="trust-item__icon">💰</div>
-            <h2 class="trust-item__title">Spend caps &amp; receipts</h2>
+            <h2 class="trust-item__title">Per-run spend caps &amp; receipts</h2>
             <p class="trust-item__desc">
-              Every run has a hard spend cap. Budget is reserved before work
-              starts. Cost is committed only when the result artifact and its
-              receipt metadata are captured &mdash; no receipt, no settlement.
+              Every run carries a per-run spend cap
+              (<code>reservation.max_cost_usd</code>) &mdash; the maximum USD
+              amount reserved for a single run, not an account-level or
+              monthly budget. Budget is reserved before work starts. Cost is
+              committed only when the result artifact and its receipt metadata
+              are captured &mdash; no receipt, no settlement.
             </p>
           </div>
 
@@ -127,16 +142,16 @@
     <!-- Private beta honesty -->
     <section class="section section--alt">
       <div class="container" style="max-width:680px;">
-        <h2 class="section-title">A note on private beta</h2>
+        <h2 class="section-title">A note on Sandbox paid private beta</h2>
         <p style="font-size:16px; color:var(--text-secondary); line-height:1.75; margin-bottom:20px;">
-          Decisionproof is in paid private beta. The service runs on AWS (EKS, RDS,
+          Decisionproof is in Sandbox paid private beta. The service runs on AWS (EKS, RDS,
           ElastiCache, S3) using production-grade configuration, but we do not
-          publish uptime SLAs during the beta period. APIs, limits, and operational
+          publish uptime SLAs during the Sandbox beta period. APIs, limits, and operational
           defaults may change.
         </p>
         <p style="font-size:16px; color:var(--text-secondary); line-height:1.75; margin-bottom:20px;">
           We do not claim third-party compliance certifications or regulatory
-          coverage during the paid private beta. The controls on this page are
+          coverage during the Sandbox paid private beta. The controls on this page are
           architectural &mdash; not certifications. If your use case requires a
           named certification, Decisionproof may not be the right fit at this
           time.
@@ -144,7 +159,11 @@
         <p style="font-size:16px; color:var(--text-secondary); line-height:1.75; margin-bottom:0;">
           If you experience an outage or unexpected behaviour, contact
           <a href="mailto:ghilplip934@gmail.com">ghilplip934@gmail.com</a>.
-          We respond within 1 business day. Commercial refund requests are
+          Sandbox support is email-based and best effort, with a target first
+          response within 1 business day; there is no 24/7 on-call, no phone
+          support, and no uptime SLA for Sandbox. Design Partner support
+          targets are defined in the signed pilot agreement and support
+          playbook, not in this Sandbox note. Commercial refund requests are
           reviewed case-by-case within 48 hours of purchase; non-waivable
           consumer-protection rights in your jurisdiction are preserved
           separately &mdash; see the
@@ -159,7 +178,7 @@
       <div class="container text-center">
         <h2 class="section-title">Questions about security?</h2>
         <p class="text-muted mb-32" style="font-size:17px;">
-          We respond to all security and compliance enquiries within 1 business day.
+          Sandbox security &amp; compliance enquiries: email support, best effort, target first response within 1 business day.
         </p>
         <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
           <a href="/contact.html" class="btn btn--primary btn--lg">Contact us</a>

@@ -1,5 +1,17 @@
 # Decisionproof v0.4 Release Notes
 
+> ⚠️ **LEGACY / SUPERSEDED (2026-04-24, MT0A-1 Surface Sync Patch)**
+>
+> This file is retained for historical reference only. Several statements below — including the `dpp_live_{key}` auth format, the "1,000 decision credits / hard cap 2,000" usage model, and the "No TTL" retention phrasing — have been **explicitly superseded** by the MT0A-1 DEC register (`_DP_v1_0/open_ssot_decisions_v0.2_redteam.md`). Do **not** rely on this document for current API, auth, pricing, retention, or support contract. For the authoritative current state, see:
+>
+> - Quickstart (current API): `/docs/quickstart.html`
+> - Sandbox pricing: `/pricing.html`
+> - Terms & retention: `/terms.html`
+> - SSOT: `dpp/docs/SPEC_LOCK_PUBLIC_CONTRACT.md` (MT0A-1 aligned)
+> - LLM-readable summary: `/llms.txt`, `/llms-full.txt`
+>
+> Per `/llms.txt`, this file is listed among retired surfaces.
+
 > **Status**: Paid private beta — not generally available.
 > This document covers the v0.4 release candidate for invited beta participants.
 

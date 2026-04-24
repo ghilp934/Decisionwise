@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Terms of Use — Decisionproof</title>
-  <meta name="description" content="Terms of Use for the Decisionproof paid private beta. Eligibility, payment, refunds, acceptable use, disclaimers, limitation of liability, and governing law.">
+  <meta name="description" content="Terms of Use for the Decisionproof Sandbox paid private beta. Eligibility, payment, refunds, acceptable use, retention, disclaimers, limitation of liability, and governing law.">
   <link rel="canonical" href="https://www.decisionproof.io.kr/terms.html">
   <link rel="stylesheet" href="/css/dpp.css">
 </head>
@@ -29,13 +29,17 @@
 
       <div class="hero__eyebrow" style="margin-bottom:8px;">Legal</div>
       <h1 style="font-size:32px; font-weight:800; margin:0 0 8px;">Terms of Use</h1>
-      <p class="text-muted mb-24">Effective date: 2026-04-20. Last updated: 2026-04-20.</p>
+      <p class="text-muted mb-24">Effective date: 2026-04-20. Last updated: 2026-04-24 (MT0A-1 alignment).</p>
 
       <div class="alert alert--info mb-32" style="font-size:14px; line-height:1.7;">
-        <strong>Paid private beta.</strong> These terms govern your use of the
-        Decisionproof service during a paid private beta. The service is not
-        generally available. Features, limits, pricing, and operational defaults
-        may change on reasonable notice, as described below.
+        <strong>Sandbox paid private beta.</strong> These terms govern your use
+        of the Decisionproof service during the Sandbox paid private beta. The
+        service is not generally available. Features, limits, pricing, and
+        operational defaults may change on reasonable notice, as described
+        below. Sandbox is time-boxed and limit-enforced; it is not the B2B
+        Design Partner offer. Design Partner engagements are contracted
+        separately and governed by the signed pilot agreement, not these
+        Sandbox Terms.
       </div>
 
       <style>
@@ -107,17 +111,17 @@
         </p>
 
         <!-- 4. Beta status and changeability -->
-        <h2><span class="num">4.</span> Beta status and changeability</h2>
+        <h2><span class="num">4.</span> Sandbox paid private beta status and changeability</h2>
         <p>
-          The Service is offered as a <strong>paid private beta</strong>. It is
+          The Service is offered as a <strong>Sandbox paid private beta</strong>. It is
           not generally available and is provided for evaluation and early
           production use at the Customer's own risk. We may, on reasonable
           notice where practicable:
         </p>
         <ul>
-          <li>modify, add, or remove features, API endpoints, rate limits, cost caps, and operational defaults;</li>
-          <li>change pricing, credit allocations, or billing mechanics for future billing cycles;</li>
-          <li>discontinue the beta or transition it to a different offering.</li>
+          <li>modify, add, or remove features, API endpoints, rate limits, per-run spend caps, and operational defaults;</li>
+          <li>change Sandbox pricing or billing mechanics for future access cycles;</li>
+          <li>discontinue the Sandbox paid private beta or transition it to a different offering.</li>
         </ul>
         <p>
           Changes of this kind are a normal part of a beta service. They do not,
@@ -129,8 +133,9 @@
         <h2><span class="num">5.</span> API access and API keys</h2>
         <p>
           Access to the Decisionproof API is authenticated with API keys
-          (tokens issued from your workspace dashboard). During the paid
-          private beta, you may hold up to <strong>3 API keys per workspace</strong>.
+          (bearer tokens in the form <code>dp_live_{secret}</code>, issued
+          from your workspace dashboard). During the Sandbox paid private
+          beta, you may hold up to <strong>3 API keys per workspace</strong>.
         </p>
         <ul>
           <li>API keys are long-lived bearer tokens. Treat them as passwords: do not commit them to source control, share them outside your organization, or transmit them over insecure channels.</li>
@@ -139,45 +144,59 @@
         </ul>
 
         <!-- 6. Pricing, payment, and renewal -->
-        <h2><span class="num">6.</span> Pricing, payment, and renewal</h2>
+        <h2><span class="num">6.</span> Sandbox pricing, payment, and renewal</h2>
         <p>
-          The current price of the paid private beta is
+          The current price of the Sandbox paid private beta is
           <strong>US$29 per 30-day access cycle</strong>, subject to the limits
           published on the <a href="/pricing.html">Pricing</a> page, including:
         </p>
         <ul>
-          <li>1,000 decision credits included per 30-day cycle;</li>
-          <li>a per-cycle hard cap of 2,000 decision credits;</li>
-          <li>a per-run cost cap of US$5.00;</li>
-          <li>workspace-level rate limits;</li>
-          <li>up to 3 API keys per workspace.</li>
+          <li>a 30-day Sandbox access window per payment; manual renewal only;</li>
+          <li>a per-run spend cap (<code>reservation.max_cost_usd</code>) of US$5.00 &mdash; the maximum USD amount reserved for a single run, not an account-level, workspace-level, monthly, or billing-cycle budget;</li>
+          <li>a workspace rate limit of 60 requests per minute (sliding window);</li>
+          <li>a monthly metered-operation cap of up to 2,000 operations per 30-day access cycle, hard-capped and fail-closed &mdash; once the cap is reached, additional requests return HTTP 429 <code>quota-exceeded</code> until the next paid access cycle;</li>
+          <li>a per-run execution timeout of 30 seconds;</li>
+          <li>per-run input and output token limits of 16,000 and 4,000 tokens respectively;</li>
+          <li>up to 3 API keys (format <code>dp_live_{secret}</code>) per workspace;</li>
+          <li><strong>no overage billing</strong> &mdash; requests that would exceed any of the Sandbox limits above are rejected fail-closed with HTTP 429 rather than accepted for additional charges. The US$29 / 30-day fee is the only amount Decisionproof charges for Sandbox access.</li>
         </ul>
         <p>
-          Payments are processed by <strong>PayPal</strong>, which may permit
-          card payment through PayPal guest checkout for eligible buyers.
-          Decisionproof does not receive or store card numbers or payment
-          credentials; invoices are available through your PayPal receipt.
-          Prices are in US dollars and are exclusive of any taxes, duties, or
-          fees that may be imposed by your jurisdiction, which are your
-          responsibility.
+          Sandbox payments are processed by <strong>PayPal</strong>, which may
+          permit card payment through PayPal guest checkout for eligible
+          buyers. Decisionproof does not receive or store card numbers or
+          payment credentials; Sandbox invoices are available through your
+          PayPal receipt. Prices are in US dollars and are exclusive of any
+          taxes, duties, or fees that may be imposed by your jurisdiction,
+          which are your responsibility.
         </p>
         <p>
-          <strong>There is no auto-renewal.</strong> Access expires 30 days
-          after a successful payment. To continue using the Service, you
+          B2B Design Partner engagements are not offered through this Sandbox
+          pricing. Design Partner engagements are contracted separately and
+          billed through manual invoice, bank remittance, and applicable
+          tax-invoice workflows under the signed pilot agreement.
+        </p>
+        <p>
+          <strong>There is no auto-renewal.</strong> Sandbox access expires 30
+          days after a successful payment. To continue using the Service, you
           must manually renew before or after expiry. No action is required
           to cancel &mdash; simply do not renew.
         </p>
 
         <!-- 7. Refunds and mandatory consumer rights -->
-        <h2><span class="num">7.</span> Refunds and mandatory consumer rights</h2>
+        <h2><span class="num">7.</span> Refunds and mandatory consumer rights (Sandbox)</h2>
         <h3>7.1 Commercial refund policy</h3>
         <p>
-          As a matter of commercial policy, refund requests are
-          <strong>reviewed on a case-by-case basis when submitted within 48 hours
-          of the original purchase</strong>. Refund decisions take into account
-          factors such as duplicate payment, documented inability to access the
-          Service, and good-faith use of included credits. This commercial
-          policy does not, by itself, guarantee a refund.
+          As a matter of commercial policy for Sandbox purchases, refund
+          requests are <strong>reviewed on a case-by-case basis when submitted
+          within 48 hours of the original purchase</strong>. Refund decisions
+          take into account factors such as duplicate payment, documented
+          inability to access the Service, and good-faith Sandbox usage.
+          This commercial policy does not, by itself, guarantee a refund.
+        </p>
+        <p>
+          This Sandbox refund policy does not apply to B2B Design Partner
+          engagements, which are governed by the signed pilot agreement,
+          separate commercial terms, and applicable tax-invoice workflows.
         </p>
         <p>
           Outside that 48-hour window, Decisionproof does not offer refunds as
@@ -212,6 +231,53 @@
           PayPal order reference, a brief description of the issue, and, where
           relevant, a reference to the consumer-protection right you are
           invoking.
+        </p>
+
+        <!-- 7A. Retention and data lifecycle -->
+        <h2><span class="num">7A.</span> Retention and data lifecycle (Sandbox)</h2>
+        <p>
+          Decisionproof applies a tiered retention model. Customer-facing
+          retention consists of:
+        </p>
+        <ul>
+          <li><strong>Hot</strong>: online operational/audit data available for immediate export.</li>
+          <li><strong>Cold Archive</strong>: archived audit records retrievable after the Hot window, available only where included in the customer's plan or contract (up to 1 year).</li>
+          <li><strong>Deep Archive</strong>: long-term retention available only as a paid add-on or contract-specific option.</li>
+        </ul>
+        <p>
+          For the Sandbox paid private beta, <strong>Hot online access is 30
+          days by default</strong>. Sandbox data does <strong>not</strong>
+          automatically move to Cold Archive. After the Hot window, Sandbox
+          records and result artifacts are not guaranteed to remain online or
+          retrievable and may be queued for deletion or purge under the
+          applicable data handling policy, unless a separate plan, contract,
+          legal hold, or security/audit obligation requires otherwise.
+        </p>
+        <p>
+          Audit evidence is designed to be append-only and tamper-evident for
+          the records it covers. Lifecycle retention, personal-data deletion
+          requests, legal holds, and security/audit obligations are handled
+          separately under the applicable data handling policy and any
+          applicable contract; the append-only design of audit evidence does
+          not override those lifecycle controls or any mandatory legal right
+          you hold under applicable law (see Section 7.2).
+        </p>
+        <p>
+          The technical mechanism by which Decisionproof honours a lawful
+          deletion request in the presence of append-only audit records is
+          <strong>cryptographic erasure of per-tenant data encryption
+          keys</strong>: run inputs and result artifacts are encrypted
+          per-tenant; on a qualifying deletion request the tenant key is
+          scheduled for destruction via AWS KMS with a pending window, after
+          which the corresponding cleartext is mathematically unrecoverable.
+          Audit evidence (which does not contain raw inputs or results,
+          only identifiers, hashes, timestamps, and settlement amounts)
+          continues to be retained for statutory minima (e.g. commercial /
+          tax / anti-fraud records). End-to-end completion is bounded at
+          approximately fifty-one days from ticket acceptance. Deletion
+          requests should be sent to
+          <a href="mailto:ghilplip934@gmail.com">ghilplip934@gmail.com</a>
+          with the phrase "Deletion request" in the subject line.
         </p>
 
         <!-- 8. Acceptable use -->
@@ -290,7 +356,7 @@
         <h2><span class="num">11.</span> Disclaimers</h2>
         <p>
           <strong>The Service is provided "as is" and "as available" during
-          the paid private beta</strong>, subject to any warranty that
+          the Sandbox paid private beta</strong>, subject to any warranty that
           cannot be excluded under mandatory applicable law. To the maximum
           extent permitted by law, Decisionproof disclaims all other
           warranties, whether express, implied, statutory, or otherwise,
@@ -299,9 +365,9 @@
           of course of dealing or course of performance.
         </p>
         <ul>
-          <li><strong>No uptime SLA</strong> is offered during the paid private beta.</li>
-          <li>Decisionproof does <strong>not guarantee</strong> that outputs from AI-driven runs will be accurate, complete, unbiased, or fit for any particular decision. You are responsible for reviewing outputs before relying on them.</li>
-          <li>Decisionproof does <strong>not claim</strong> third-party compliance certifications during the paid private beta and does not represent that the Service is certified or audited for any regulated industry. If your use case requires a named certification, the Service may not be the right fit at this time.</li>
+          <li><strong>No uptime SLA</strong> is offered during the Sandbox paid private beta.</li>
+          <li>Decisionproof does <strong>not guarantee</strong> that outputs from AI-driven runs will be accurate, complete, unbiased, or fit for any particular decision. You are responsible for reviewing outputs before relying on them. Decisionproof is an execution governance / settlement integrity control layer and is not an agent framework, prompt orchestration layer, model router, or model-quality evaluator.</li>
+          <li>Decisionproof does <strong>not claim</strong> third-party compliance certifications during the Sandbox paid private beta and does not represent that the Service is certified or audited for any regulated industry. If your use case requires a named certification, the Service may not be the right fit at this time.</li>
           <li>Architectural controls described on the <a href="/security.html">Security</a> page are design-level measures, not legal or regulatory guarantees.</li>
         </ul>
 
@@ -395,10 +461,19 @@
         <!-- 16. Support and contact -->
         <h2><span class="num">16.</span> Support and contact</h2>
         <p>
-          Paid private beta support is provided on a best-effort basis during
-          ordinary business hours, with a target response time of 1 business
-          day. There is no 24/7 on-call, no phone line, and no uptime SLA
-          during the paid private beta.
+          Sandbox support is email-based and best effort during ordinary
+          business hours, with a target first response within 1 business day.
+          There is no 24/7 on-call, no phone support, and no uptime SLA for
+          Sandbox. Decisionproof does not provide support for AI model output
+          quality, prompt correctness, or third-party provider outages; support
+          focuses on settlement, state, export, and control-plane behaviour
+          within the published API surface.
+        </p>
+        <p>
+          Design Partner support is governed separately by the signed pilot
+          agreement and support playbook, which define severity-based response
+          targets (Sev1&ndash;Sev4). Those Design Partner severity targets do
+          not apply to Sandbox.
         </p>
         <p>
           Contact: <a href="mailto:ghilplip934@gmail.com">ghilplip934@gmail.com</a>

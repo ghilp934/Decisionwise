@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>How it works — Decisionproof</title>
-  <meta name="description" content="Set a spend cap, submit a run, inspect the result and receipt. Decisionproof paid private beta — $29 per 30-day cycle, 1,000 decision credits included.">
+  <meta name="description" content="Set a per-run spend cap, submit a run, inspect the result and receipt. Decisionproof Sandbox paid private beta — $29 per 30-day access cycle, time-boxed and limit-enforced, no overage billing.">
   <link rel="canonical" href="https://www.decisionproof.io.kr/how-it-works.html">
   <link rel="stylesheet" href="/css/dpp.css">
 </head>
@@ -29,11 +29,11 @@
     <!-- Hero -->
     <section class="hero" style="padding-bottom:48px;">
       <div class="container">
-        <div class="hero__eyebrow">Paid Private Beta &mdash; 4 steps</div>
-        <h1>Set a spend cap.<br>Submit a run. Inspect the receipt.</h1>
+        <div class="hero__eyebrow">Sandbox Paid Private Beta &mdash; 4 steps</div>
+        <h1>Set a per-run spend cap.<br>Submit a run. Inspect the receipt.</h1>
         <p>
           That is the whole mental model. No SDK required. Sign in with Google,
-          pay $29 for 30 days of access, issue an API key, and POST your first
+          pay $29 for 30 days of Sandbox access, issue an API key, and POST your first
           run &mdash; budget-bounded, auditable, settlement-safe by design.
         </p>
       </div>
@@ -45,9 +45,9 @@
         <div class="card card--accent">
           <h2 style="font-size:15px; font-weight:700; margin:0 0 12px; text-transform:uppercase; letter-spacing:.5px;">The loop you will run every day</h2>
           <ol style="margin:0; padding-left:20px; line-height:1.85; color:var(--text-primary);">
-            <li><strong>Set a spend cap</strong> on the run (e.g. <code>max_cost_usd: "5.00"</code>).</li>
+            <li><strong>Set a per-run spend cap</strong> on the run (e.g. <code>reservation.max_cost_usd: "5.00"</code>).</li>
             <li><strong>Submit the run</strong> with an <code>Idempotency-Key</code> so retries are safe.</li>
-            <li><strong>Inspect the result and receipt</strong> &mdash; actual cost, state transitions, and the exportable audit record.</li>
+            <li><strong>Inspect the result and receipt</strong> &mdash; actual cost, state transitions, and the audit record (exported within the applicable retention window; Sandbox Hot 30 days by default).</li>
           </ol>
         </div>
       </div>
@@ -64,7 +64,7 @@
             <div class="how-step__body">
               <h2 class="how-step__title">Sign in with Google</h2>
               <p class="how-step__desc">
-                Access requires a Google account during the paid private beta.
+                Access requires a Google account during the Sandbox paid private beta.
                 <a href="/login.html?tab=signup">Sign in at decisionproof.io.kr</a>
                 &mdash; no separate password, no credit card required at this step.
               </p>
@@ -74,13 +74,23 @@
           <div class="how-step">
             <div class="how-step__num" aria-hidden="true">2</div>
             <div class="how-step__body">
-              <h2 class="how-step__title">Pay $29 for 30-day access</h2>
+              <h2 class="how-step__title">Pay $29 for 30-day Sandbox access</h2>
               <p class="how-step__desc">
                 Pay <strong>$29</strong> via PayPal to activate your workspace for a
-                30-day cycle. Each cycle includes <strong>1,000 decision credits</strong>
-                with a per-cycle <strong>hard cap of 2,000</strong> and a per-run cost
-                cap of <strong>$5.00</strong>. Access does not auto-renew &mdash; you
-                choose when to renew.
+                30-day Sandbox access window. Sandbox is <strong>time-boxed and
+                limit-enforced</strong> by the following hard numerics:
+                per-run spend cap <strong>US$5.00</strong>
+                (<code>reservation.max_cost_usd</code>),
+                workspace rate limit <strong>60 req/min</strong>,
+                monthly metered-operation cap <strong>up to 2,000 per 30-day cycle</strong>,
+                per-run execution timeout <strong>30 seconds</strong>,
+                per-run input/output token limits <strong>16,000 / 4,000</strong>,
+                and up to <strong>3 API keys</strong> per workspace.
+                <strong>No overage billing</strong> &mdash; any breach yields
+                HTTP 429 <code>quota-exceeded</code>; the US$29 / 30-day fee
+                is the only amount we charge for Sandbox. Access does not
+                auto-renew. Sandbox is not the B2B Design Partner offer;
+                Design Partner engagements are contracted separately.
               </p>
               <p class="how-step__desc mt-8">
                 <a href="/pricing.html">See full pricing details &rarr;</a>
@@ -106,15 +116,17 @@
             <div class="how-step__body">
               <h2 class="how-step__title">Submit your first run</h2>
               <p class="how-step__desc">
-                POST a structured run payload with a hard spend cap. You get back
+                POST a structured run payload with a per-run spend cap under
+                <code>reservation.max_cost_usd</code>. You get back
                 a run ID to poll; on completion, the result and the receipt
                 (including <code>actual_cost_usd</code>) are available via the run
-                endpoint and your exportable audit log.
+                endpoint and your audit log (exportable within the applicable
+                retention window &mdash; Sandbox Hot 30 days by default).
               </p>
 
               <div style="margin-top:20px;">
                 <pre><code>curl -X POST https://api.decisionproof.io.kr/v1/runs \
-  -H "Authorization: Bearer dpp_live_your_key_here" \
+  -H "Authorization: Bearer dp_live_your_key_here" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: my-unique-key-123" \
   -d '{
@@ -123,7 +135,9 @@
       "question": "Should I launch this product?",
       "mode": "detailed"
     },
-    "max_cost_usd": "5.00"
+    "reservation": {
+      "max_cost_usd": "5.00"
+    }
   }'</code></pre>
               </div>
 
@@ -141,36 +155,46 @@
     <!-- What you get -->
     <section class="section section--alt">
       <div class="container" style="max-width:720px;">
-        <h2 class="section-title">What's included</h2>
+        <h2 class="section-title">What's included in Sandbox</h2>
         <p class="section-sub">
-          Every paid private beta subscription gives you full API feature access.
-          Workspace-level limits apply during beta to keep usage predictable and the service stable.
+          Sandbox gives you access to the currently enabled beta API surface.
+          Sandbox is time-boxed and limit-enforced; workspace rate limits, API-key
+          limits, and per-run USD spend caps apply. There is no overage billing &mdash;
+          requests that exceed active Sandbox limits are rejected fail-closed.
         </p>
 
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
           <div class="card">
-            <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">Full API feature access</h3>
-            <p class="text-sm text-muted mb-0">All beta endpoints: runs, API keys, audit log export.</p>
+            <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">Sandbox beta API surface</h3>
+            <p class="text-sm text-muted mb-0">Access to the currently enabled Sandbox beta API surface: runs, API keys, audit log export (within the applicable retention window).</p>
           </div>
           <div class="card">
-            <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">1,000 decision credits / cycle</h3>
-            <p class="text-sm text-muted mb-0">Each 30-day cycle includes 1,000 decision credits for live usage.</p>
+            <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">30-day Sandbox access window</h3>
+            <p class="text-sm text-muted mb-0">Each payment activates a 30-day Sandbox access window. Manual renewal only; no auto-renewal.</p>
           </div>
           <div class="card">
-            <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">Hard cap: 2,000 credits</h3>
-            <p class="text-sm text-muted mb-0">A workspace cannot exceed 2,000 decision credits in a single 30-day cycle.</p>
+            <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">Per-run spend cap: $5.00</h3>
+            <p class="text-sm text-muted mb-0">Submit runs with <code>reservation.max_cost_usd</code> &mdash; the per-run spend cap is US$5.00 during Sandbox beta.</p>
           </div>
           <div class="card">
-            <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">Per-run cost cap: $5.00</h3>
-            <p class="text-sm text-muted mb-0">Submit runs with your own <code>max_cost_usd</code>, capped at $5.00 per run during beta.</p>
+            <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">Rate limit: 60 req/min</h3>
+            <p class="text-sm text-muted mb-0">Workspace rate limit 60 requests/minute (sliding window). Exceeding returns HTTP 429 with <code>RateLimit-Remaining</code> / <code>Retry-After</code> headers.</p>
+          </div>
+          <div class="card">
+            <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">Monthly cap: 2,000 ops</h3>
+            <p class="text-sm text-muted mb-0">Up to 2,000 metered operations per 30-day cycle, hard-capped and fail-closed. No overage billing &mdash; US$29 / 30-day is the only amount charged.</p>
+          </div>
+          <div class="card">
+            <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">Per-run timeout: 30 s</h3>
+            <p class="text-sm text-muted mb-0">Per-run execution timeout 30 seconds; per-run input/output token limits 16,000 / 4,000.</p>
           </div>
           <div class="card">
             <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">Up to 3 API keys</h3>
-            <p class="text-sm text-muted mb-0">Create separate keys for environments or workflows, with independent revocation.</p>
+            <p class="text-sm text-muted mb-0">Up to 3 concurrent <code>dp_live_{secret}</code> keys per workspace, independently revocable.</p>
           </div>
           <div class="card">
-            <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">Exportable audit trail</h3>
-            <p class="text-sm text-muted mb-0">Every run is logged as input → state transitions → result → settlement, and exportable any time.</p>
+            <h3 style="font-size:15px; font-weight:700; margin:0 0 6px;">Audit trail (Hot 30 days)</h3>
+            <p class="text-sm text-muted mb-0">Run metadata, state transitions, receipt records, and result references are logged. Sandbox includes Hot online access for 30 days; Cold/Deep Archive are not included unless separately contracted.</p>
           </div>
         </div>
       </div>
@@ -181,10 +205,10 @@
       <div class="container text-center">
         <h2 class="section-title">Ready to get started?</h2>
         <p class="text-muted mb-32" style="font-size:17px;">
-          Paid private beta &mdash; $29 per 30-day cycle, 1,000 decision credits included, no auto-renewal.
+          Sandbox paid private beta &mdash; $29 per 30-day access cycle, time-boxed and limit-enforced, no overage billing, no auto-renewal.
         </p>
         <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-          <a href="/login.html?tab=signup" class="btn btn--primary btn--lg">Join private beta</a>
+          <a href="/login.html?tab=signup" class="btn btn--primary btn--lg">Join Sandbox beta</a>
           <a href="/pricing.html" class="btn btn--outline btn--lg">See pricing</a>
         </div>
       </div>

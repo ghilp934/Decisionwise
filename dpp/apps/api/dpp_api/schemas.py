@@ -12,10 +12,21 @@ from pydantic import BaseModel, Field
 
 
 class RunReservation(BaseModel):
-    """Reservation parameters for run submission."""
+    """Reservation parameters for a single run submission.
+
+    MT0A-1 / DEC-MT0A-02: `max_cost_usd` is always a **per-run spend cap** —
+    the maximum USD amount reserved for a single run. It is not an
+    account-level, workspace-level, monthly, or billing-cycle budget.
+    """
 
     max_cost_usd: str = Field(
-        ..., description="Maximum cost in USD (4dp string)", pattern=r"^\d+(\.\d{1,4})?$"
+        ...,
+        description=(
+            "Per-run spend cap (`reservation.max_cost_usd`): the maximum USD "
+            "amount reserved for a single run, as a 4-decimal string. Not an "
+            "account-level, workspace-level, monthly, or billing-cycle budget."
+        ),
+        pattern=r"^\d+(\.\d{1,4})?$",
     )
     timebox_sec: int = Field(default=90, ge=1, le=90, description="Execution timeout")
     min_reliability_score: float = Field(
@@ -27,11 +38,17 @@ class RunMeta(BaseModel):
     """Metadata for run."""
 
     trace_id: Optional[str] = None
-    profile_version: str = "v0.4.2.2"
+    profile_version: str = "v0.4.2.10"
 
 
 class RunCreateRequest(BaseModel):
-    """Request body for POST /v1/runs."""
+    """Request body for POST /v1/runs.
+
+    MT0A-1: the customer-facing request contract requires a nested
+    ``reservation`` object with ``reservation.max_cost_usd`` (per-run spend
+    cap). Top-level ``max_cost_usd`` is not accepted and must not appear in
+    customer-facing examples.
+    """
 
     pack_type: str = Field(..., description="Pack type (decision, url, ocr, etc.)")
     inputs: dict[str, Any] = Field(..., description="Pack-specific inputs")

@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "6f2d2a87-1199-4bcb-a2a2-c787f5b6c8b8",
 		"name": "Decisionproof Mini Demo",
-		"description": "Agent-centric decision execution platform with idempotent metering, RFC 9457 error handling, and IETF RateLimit headers.",
+		"description": "Execution governance surface for budget-bounded AI runs, with idempotent submission, per-run spend-cap enforcement (`reservation.max_cost_usd`), receipt-backed settlement, RFC 9457 errors, and IETF RateLimit headers. Decisionproof is an execution governance / settlement integrity control layer — not an agent framework, prompt orchestration layer, model router, or model-quality evaluator. This collection describes the Mini Demo (Marketplace) surface exposed via RapidAPI; the production API base URL is https://api.decisionproof.io.kr.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_uid": "52590545-6f2d2a87-1199-4bcb-a2a2-c787f5b6c8b8"
 	},
@@ -39,7 +39,7 @@
 								"runs"
 							]
 						},
-						"description": "Submit a question for AI-powered decision evaluation. Returns a run_id for polling. Auth: X-RapidAPI-Proxy-Secret + Bearer token. Plans: BASIC (6 POST/min, 1 concurrent) | PRO (24 POST/min, 3 concurrent)."
+						"description": "Submit a demo run for evaluation under the Decisionproof execution governance surface. Returns a run_id for polling. Auth: X-RapidAPI-Proxy-Secret + Bearer token (demo marketplace plan). Demo marketplace plans BASIC (6 POST/min, 1 concurrent) and PRO (24 POST/min, 3 concurrent) are specific to the RapidAPI marketplace listing and are not mapped to the customer-facing Sandbox / Design Partner / Growth / Enterprise tiers described on decisionproof.io.kr. Decisionproof does not warrant the accuracy, completeness, or suitability of third-party AI model outputs."
 					},
 					"response": [
 						{

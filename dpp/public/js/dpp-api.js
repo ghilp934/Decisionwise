@@ -6,8 +6,22 @@
  *   import { api } from './dpp-api.js';
  *   const session = await api.post('/v1/billing/checkout-sessions', { plan_id: '...' });
  *
- * All requests automatically include the Bearer token from sessionStorage.
- * On 401, clears auth state and redirects to /login.html.
+ * Auth model:
+ *   The Bearer token attached here is the Supabase session JWT (from
+ *   sessionStorage), used for dashboard/onboarding/billing surface calls.
+ *   It is NOT the customer-facing API key used to call /v1/runs — those
+ *   use the dp_live_{secret} format per DEC-MT0A-01 and are never stored
+ *   in sessionStorage by this client.
+ *
+ * MT0A-1 review (2026-04-24):
+ *   - API_BASE uses the canonical production host `api.decisionproof.io.kr`
+ *     (DEC-MT0A-03). ✓
+ *   - No Decision Credits / DC / max_cost_usd payload construction in this
+ *     client; run-submission payload construction (which must use the
+ *     nested `reservation.max_cost_usd` form per DEC-MT0A-02) is a server
+ *     or customer-integration concern, not a responsibility of this
+ *     dashboard API client. ✓
+ *   - On 401, clears auth state and redirects to /login.html.
  */
 
 const API_BASE = 'https://api.decisionproof.io.kr';
